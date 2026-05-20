@@ -1,0 +1,33 @@
+# Git and Version Control
+.git
+.github
+.gitignore
+
+# Environments and venvs
+venv/
+sienv/
+.env
+.python-version
+
+# Python artifacts and caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# Dataset and temporary output files
+logs/
+xview_yolo/
+static/uploads/*
+notebooks_summary.txt
+C:\Users\harsh\.gemini\antigravity\brain\*
+
+# Large weight files (downloaded dynamically or mounted)
+*.pt
+*.engine
+*.onnx

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OrbitalEye AI | Tactical Satellite Intelligence</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-satellite-dish"></i>
+                </div>
+                <h1>ORBITAL EYE</h1>
+            </div>
+
+            <form id="detect-form" class="control-panel">
+                <div class="control-group">
+                    <label>Detection Protocol</label>
+                    <select id="mode" name="mode">
+                        <option value="yolo">YOLOv8 Real-time Tiling</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Confidence Threshold</label>
+                    <select id="threshold" name="threshold">
+                        <option value="0.25">0.25 (Standard)</option>
+                        <option value="0.5">0.50 (High Precision)</option>
+                        <option value="0.75">0.75 (Strict)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Area of Interest</label>
+                    <p style="font-size: 0.8rem; color: var(--text-dim);">Global Satellite Grid Alpha-7</p>
+                </div>
+
+                <input type="file" id="file-input" name="file" accept="image/*,.tif" style="display: none;">
+                
+                <button type="submit" id="submit-btn" class="btn-primary">
+                    <span id="btn-text">Execute Analysis</span>
+                </button>
+            </form>
+
+            <div class="recent-detections" style="margin-top: 30px;">
+                <label style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;">Recent Intel</label>
+                <div id="history-list" style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="font-size: 0.8rem; color: var(--text-dim); font-style: italic;">No recent scans...</div>
+                </div>
+            </div>
+
+            <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border);">
+                <div class="stat-label">System Status</div>
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #4ade80;">
+                    <div style="width: 8px; height: 8px; background: #4ade80; border-radius: 50%; box-shadow: 0 0 10px #4ade80;"></div>
+                    Online / Connected
+                </div>
+            </div>
+        </aside>
+
+        <main class="viewport">
+            <header class="stats-header">
+                <div class="stat-card">
+                    <span class="stat-label">Identified Objects</span>
+                    <span class="stat-value" id="obj-count">00</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Threat Index</span>
+                    <span class="stat-value" id="threat-level">N/A</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Latency</span>
+                    <span class="stat-value" id="latency">0.0ms</span>
+                </div>
+            </header>
+
+            <div class="canvas-area" id="canvas-area">
+                <div class="scanner-line" id="scanner"></div>
+                <div class="drop-zone" id="drop-zone">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p style="font-weight: 600;">DRAG & DROP SATELLITE IMAGERY</p>
+                    <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: 8px;">Supports JPG, PNG, GeoTIFF (.tif)</p>
+                    <div id="file-name" style="margin-top: 15px; font-family: var(--font-mono); color: var(--primary);"></div>
+                </div>
+                
+                <div id="image-preview-container" style="display: none; width: 100%; height: 100%;">
+                    <img id="image-preview" src="" style="width: 100%; height: 100%; object-fit: contain;">
+                </div>
+
+                <div class="processing-indicator" id="loader">
+                    <i class="fas fa-circle-notch fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+                    <p style="font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 2px;">NEURAL PROCESSING...</p>
+                </div>
+            </div>
+
+            <div class="terminal" id="terminal">
+                <div class="terminal-line">
+                    <span class="terminal-timestamp">[SYSTEM]</span>
+                    <span>System initialized. Waiting for uplink...</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileNameDisplay = document.getElementById('file-name');
+        const form = document.getElementById('detect-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const terminal = document.getElementById('terminal');
+        const loader = document.getElementById('loader');
+        const scanner = document.getElementById('scanner');
+        const previewContainer = document.getElementById('image-preview-container');
+        const previewImg = document.getElementById('image-preview');
+
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+            line.innerHTML = `<span class="terminal-timestamp">[${time}]</span> <span style="color: ${type === 'error' ? '#ff007a' : '#4ade80'}">${message}</span>`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                fileNameDisplay.textContent = `TARGET: ${file.name.toUpperCase()}`;
+                log(`Source image selected: ${file.name}`);
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImg.src = e.target.result;
+                    previewContainer.style.display = 'block';
+                    dropZone.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.background = 'rgba(0, 242, 255, 0.1)';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.background = 'transparent';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.background = 'transparent';
+            fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(new Event('change'));
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            if (!fileInput.files[0]) {
+                log("Abort: No source imagery detected.", "error");
+                return;
+            }
+
+            submitBtn.disabled = true;
+            loader.style.display = 'flex';
+            scanner.style.display = 'block';
+            log(`Initiating YOLOv8 tiling inference protocol...`);
+
+            const startTime = performance.now();
+
+            try {
+                const response = await fetch('/detect', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.status === 'error') {
+                    throw new Error(data.message);
+                }
+
+                const endTime = performance.now();
+                const duration = (endTime - startTime).toFixed(1);
+
+                document.getElementById('obj-count').textContent = String(data.detections.length).padStart(2, '0');
+                document.getElementById('threat-level').textContent = data.threat_level;
+                document.getElementById('latency').textContent = `${duration}ms`;
+
+                log(`Analysis complete. Found ${data.detections.length} objects.`);
+                log(`Threat index: ${data.threat_level}`);
+
+                // Update image with predictions
+                if (data.image) {
+                    previewImg.src = `data:image/jpeg;base64,${data.image}`;
+                    previewContainer.style.display = 'block';
+                    dropZone.style.display = 'none';
+                }
+
+                if (data.threat_level === 'HIGH') {
+                    document.getElementById('threat-level').style.color = '#ff007a';
+                } else if (data.threat_level === 'MEDIUM') {
+                    document.getElementById('threat-level').style.color = '#ff9f00';
+                } else {
+                    document.getElementById('threat-level').style.color = '#4ade80';
+                }
+
+                // Add to history
+                addToHistory(data.filename, data.detections.length, data.threat_level);
+
+            } catch (err) {
+                log(`Critical Failure: ${err.message}`, "error");
+            } finally {
+                submitBtn.disabled = false;
+                loader.style.display = 'none';
+                scanner.style.display = 'none';
+            }
+        });
+
+        function addToHistory(filename, count, level) {
+            const historyList = document.getElementById('history-list');
+            if (historyList.children[0] && historyList.children[0].style.fontStyle === 'italic') {
+                historyList.innerHTML = '';
+            }
+            
+            const item = document.createElement('div');
+            item.style.background = 'rgba(255, 255, 255, 0.03)';
+            item.style.padding = '10px';
+            item.style.borderRadius = '6px';
+            item.style.borderLeft = `3px solid ${level === 'HIGH' ? '#ff007a' : (level === 'MEDIUM' ? '#ff9f00' : '#4ade80')}`;
+            item.innerHTML = `
+                <div style="font-size: 0.75rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${filename}</div>
+                <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 4px;">Objs: ${count} | Level: ${level}</div>
+            `;
+            historyList.prepend(item);
+        }
+    </script>
+</body>
+</html>
