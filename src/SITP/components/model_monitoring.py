@@ -42,7 +42,7 @@ class ModelMonitoring:
     @staticmethod
     def read_results(results_csv: str | Path) -> pd.DataFrame:
         """
-        Read the ``results.csv`` written by YOLO11 during training.
+        Read the ``results.csv`` written by YOLOv8 during training.
 
         Parameters
         ----------

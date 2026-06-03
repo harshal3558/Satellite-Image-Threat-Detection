@@ -3,7 +3,7 @@ Flask web application for Satellite Image Threat Detection.
 
 Routes:
     GET  /           — Upload page
-    POST /           — Run tiled YOLO11 inference and render results directly
+    POST /           — Run tiled YOLOv8 inference and render results directly
     GET  /health     — Simple health-check endpoint
 """
 

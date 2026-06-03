@@ -1,7 +1,7 @@
 """
 Model Trainer component for the Satellite Image Threat Detection pipeline.
 
-Trains a YOLO11 model on the prepared YOLO chips and validates the best
+Trains a YOLOv8 model on the prepared YOLO chips and validates the best
 checkpoint — directly mirroring the notebook's train_model / validate_model
 functions.
 """
@@ -25,7 +25,7 @@ from src.SITP.logger import logging
 @dataclass
 class ModelTrainerConfig:
     """Training hyper-parameters (mirrors the notebook defaults)."""
-    model_weights: str = "yolo11m.pt"      # pretrained weights to start from
+    model_weights: str = "yolov8m.pt"      # pretrained weights to start from
     epochs: int = 50
     imgsz: int = 512                        # must match chip_size
     batch: int = 8
@@ -50,7 +50,7 @@ class ModelTrainerConfig:
 
 class ModelTrainer:
     """
-    Wraps YOLO11 training and validation.
+    Wraps YOLOv8 training and validation.
 
     Usage
     -----
@@ -71,7 +71,7 @@ class ModelTrainer:
         output_dir: Path,
     ) -> tuple[YOLO, Path]:
         """
-        Train YOLO11 then validate the best checkpoint.
+        Train YOLOv8 then validate the best checkpoint.
 
         Parameters
         ----------
@@ -87,7 +87,7 @@ class ModelTrainer:
             cfg = self.config
 
             logging.info(
-                f"Starting YOLO11 training: weights={cfg.model_weights}, "
+                f"Starting YOLOv8 training: weights={cfg.model_weights}, "
                 f"epochs={cfg.epochs}, imgsz={cfg.imgsz}, batch={cfg.batch}"
             )
 
@@ -126,7 +126,7 @@ class ModelTrainer:
     # ------------------------------------------------------------------
 
     def _train_model(self, data_yaml: Path, output_dir: Path) -> YOLO:
-        """Instantiate and train the YOLO11 model."""
+        """Instantiate and train the YOLOv8 model."""
         cfg = self.config
         model = YOLO(cfg.model_weights)
         model.train(

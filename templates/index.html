@@ -4,17 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SITP — Satellite Image Threat Detection</title>
-  <meta name="description" content="AI-powered satellite image threat detection using YOLO11. Upload a GeoTIFF and instantly detect objects and threats." />
+  <meta name="description" content="AI-powered satellite image threat detection using YOLOv8. Upload a GeoTIFF and instantly detect objects and threats." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght=400;600;700;900&family=Inter:wght=300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
 <body>
 
   <!-- ── Starfield Background ─────────────────────────────────────────── -->
   <div class="starfield" id="starfield">
-    <!-- Starfield divs created inline for pure styling without main.js -->
     <div class="star" style="left:12%; top:25%; --dur:4s; --delay:1s; width:2px; height:2px;"></div>
     <div class="star" style="left:35%; top:60%; --dur:5s; --delay:0s; width:1px; height:1px;"></div>
     <div class="star" style="left:58%; top:15%; --dur:3s; --delay:2s; width:3px; height:3px;"></div>
@@ -60,7 +59,7 @@
   <!-- ── Hero ─────────────────────────────────────────────────────────── -->
   <section class="hero">
     <div class="hero-content">
-      <div class="hero-tag">YOLO11 · xView Dataset · Real-Time Detection</div>
+      <div class="hero-tag">YOLOv8 · xView Dataset · Real-Time Detection</div>
       <h1 class="hero-title">
         Satellite <span class="gradient-text">Threat</span><br/>
         Detection AI
@@ -94,27 +93,31 @@
   <main class="main-panel">
 
     {% if not success %}
-    <form action="/" method="POST" enctype="multipart/form-data">
+    <form id="upload-form" action="/" method="POST" enctype="multipart/form-data">
       <!-- Controls -->
       <div class="controls-row">
         <div class="control-group">
           <label class="ctrl-label" for="conf-slider">
             Confidence Threshold: <span id="conf-val">{{ conf_val|default(0.25) }}</span>
           </label>
-          <input type="range" name="conf" id="conf-slider" min="0.05" max="0.95" step="0.05" value="{{ conf_val|default(0.25) }}" class="slider" oninput="document.getElementById('conf-val').textContent = parseFloat(this.value).toFixed(2)" />
+          <input type="range" name="conf" id="conf-slider" min="0.05" max="0.95" step="0.05"
+            value="{{ conf_val|default(0.25) }}" class="slider"
+            oninput="document.getElementById('conf-val').textContent = parseFloat(this.value).toFixed(2)" />
         </div>
         <div class="control-group">
           <label class="ctrl-label" for="iou-slider">
             IoU Threshold: <span id="iou-val">{{ iou_val|default(0.45) }}</span>
           </label>
-          <input type="range" name="iou" id="iou-slider" min="0.1" max="0.9" step="0.05" value="{{ iou_val|default(0.45) }}" class="slider" oninput="document.getElementById('iou-val').textContent = parseFloat(this.value).toFixed(2)" />
+          <input type="range" name="iou" id="iou-slider" min="0.1" max="0.9" step="0.05"
+            value="{{ iou_val|default(0.45) }}" class="slider"
+            oninput="document.getElementById('iou-val').textContent = parseFloat(this.value).toFixed(2)" />
         </div>
       </div>
 
-      <!-- Drop zone (Simple form input style since external JS is removed) -->
+      <!-- Drop zone -->
       <div class="dropzone" id="dz-zone" onclick="document.getElementById('file-input').click()">
-        <input type="file" name="file" id="file-input" accept=".tif,.tiff" hidden onchange="if(this.files && this.files[0]) { document.getElementById('dz-file-status').style.display = 'flex'; document.getElementById('dz-file-name-text').textContent = 'Ready for Scan: ' + this.files[0].name; document.getElementById('dz-zone').style.borderColor = 'var(--accent-green)'; document.getElementById('dz-zone').style.boxShadow = 'var(--shadow-glow-g)'; }" required />
-        <div class="dz-icon">
+        <input type="file" name="file" id="file-input" accept=".tif,.tiff" hidden required />
+        <div class="dz-icon" id="dz-icon">
           <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="4" y="12" width="56" height="40" rx="4" stroke="currentColor" stroke-width="2" stroke-dasharray="6 3"/>
             <path d="M32 44V28M32 28L24 36M32 28L40 36" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -122,11 +125,12 @@
             <text x="32" y="15" text-anchor="middle" font-size="6" fill="currentColor" font-family="monospace">.TIF</text>
           </svg>
         </div>
-        <p class="dz-title">Click to upload GeoTIFF image</p>
-        <p class="dz-sub">Select a .tif / .tiff file from your filesystem</p>
+        <p class="dz-title" id="dz-title">Click to upload GeoTIFF image</p>
+        <p class="dz-sub" id="dz-sub">Select a .tif / .tiff file from your filesystem</p>
         <p class="dz-hint">Supports sizes up to 500 MB</p>
-        <div class="dz-file-status" id="dz-file-status" style="display:none; align-items:center; justify-content:center; gap:8px; margin-top:12px; font-size:0.85rem; color:var(--accent-green)">
-          <span class="status-dot" style="background-color:var(--accent-green); box-shadow:0 0 10px var(--accent-green)"></span>
+        <!-- File selected status (shown after pick) -->
+        <div class="dz-file-status" id="dz-file-status" style="display:none;">
+          <span class="status-dot" style="background:var(--accent-green);box-shadow:0 0 10px var(--accent-green);"></span>
           <strong id="dz-file-name-text"></strong>
         </div>
       </div>
@@ -291,7 +295,7 @@
         <div class="arch-card">
           <div class="arch-icon">🧠</div>
           <h3>Model Training</h3>
-          <p>YOLO11m pretrained weights fine-tuned on xView for 50 epochs with mosaic, copy-paste, and rotation augmentation.</p>
+          <p>YOLOv8m pretrained weights fine-tuned on xView for 50 epochs with mosaic, copy-paste, and rotation augmentation.</p>
         </div>
         <div class="arch-card">
           <div class="arch-icon">🔍</div>
@@ -304,7 +308,7 @@
 
   <!-- ── Footer ───────────────────────────────────────────────────────── -->
   <footer class="footer">
-    <p>SITP · Satellite Image Threat Detection · YOLO11 + xView · Built by Harshal</p>
+    <p>SITP · Satellite Image Threat Detection · YOLOv8 + xView · Built by Harshal</p>
   </footer>
 
   <!-- ── Loading Overlay ────────────────────────────────────────────── -->
@@ -318,83 +322,101 @@
       <div class="loading-steps">
         <div class="ls" id="step-upload">
           <div class="ls-dot"></div>
-          <span>Image Uploaded Successfully</span>
+          <span class="ls-label">Image Uploaded Successfully</span>
+          <span class="ls-check">✓</span>
         </div>
         <div class="ls" id="step-tile">
           <div class="ls-dot"></div>
-          <span>Performing Tiled Division (512px)</span>
+          <span class="ls-label">Performing Tiled Division (512px)</span>
+          <span class="ls-check">✓</span>
         </div>
         <div class="ls" id="step-inference">
           <div class="ls-dot"></div>
-          <span>Running YOLO11 Neural Inference</span>
+          <span class="ls-label">Running YOLOv8 Neural Inference</span>
+          <span class="ls-check">✓</span>
         </div>
         <div class="ls" id="step-nms">
           <div class="ls-dot"></div>
-          <span>Batched NMS Deduplication</span>
+          <span class="ls-label">Batched NMS Deduplication</span>
+          <span class="ls-check">✓</span>
         </div>
         <div class="ls" id="step-render">
           <div class="ls-dot"></div>
-          <span>Generating Visual HUD Overlay</span>
+          <span class="ls-label">Generating Visual HUD Overlay</span>
+          <span class="ls-check">✓</span>
         </div>
       </div>
+      <p class="loading-hint">Processing on CPU — please wait…</p>
     </div>
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const form = document.querySelector('form');
-      if (form) {
-        form.addEventListener('submit', function(e) {
-          const fileInput = document.getElementById('file-input');
-          if (!fileInput.files || fileInput.files.length === 0) {
-            return;
+    (function () {
+      // ── File input → dropzone feedback ───────────────────────────────
+      var fileInput = document.getElementById('file-input');
+      var dzZone   = document.getElementById('dz-zone');
+      var dzStatus = document.getElementById('dz-file-status');
+      var dzName   = document.getElementById('dz-file-name-text');
+      var dzTitle  = document.getElementById('dz-title');
+      var dzSub    = document.getElementById('dz-sub');
+
+      if (fileInput) {
+        fileInput.addEventListener('change', function () {
+          if (this.files && this.files.length > 0) {
+            var name = this.files[0].name;
+            dzTitle.textContent = 'File Ready for Scan';
+            dzSub.textContent   = name;
+            dzName.textContent  = name;
+            dzStatus.style.display = 'flex';
+            dzZone.classList.add('file-ready');
           }
-          
-          const overlay = document.getElementById('loading-overlay');
-          overlay.classList.add('active');
-          
-          const stepUpload = document.getElementById('step-upload');
-          const stepTile = document.getElementById('step-tile');
-          const stepInference = document.getElementById('step-inference');
-          const stepNms = document.getElementById('step-nms');
-          const stepRender = document.getElementById('step-render');
-          
-          // Step 1: Upload completes and turns green immediately on HUD start
-          stepUpload.classList.add('active');
-          setTimeout(() => {
-            stepUpload.classList.remove('active');
-            stepUpload.classList.add('done');
-            
-            // Step 2: Tiling starts
-            stepTile.classList.add('active');
-          }, 800);
-          
-          setTimeout(() => {
-            stepTile.classList.remove('active');
-            stepTile.classList.add('done');
-            
-            // Step 3: Neural Inference starts
-            stepInference.classList.add('active');
-          }, 1800);
-          
-          setTimeout(() => {
-            stepInference.classList.remove('active');
-            stepInference.classList.add('done');
-            
-            // Step 4: NMS starts
-            stepNms.classList.add('active');
-          }, 3200);
-          
-          setTimeout(() => {
-            stepNms.classList.remove('active');
-            stepNms.classList.add('done');
-            
-            // Step 5: Rendering starts
-            stepRender.classList.add('active');
-          }, 4500);
         });
       }
-    });
+
+      // ── Form submit → show loading HUD ───────────────────────────────
+      var form    = document.getElementById('upload-form');
+      var overlay = document.getElementById('loading-overlay');
+
+      var steps = [
+        { el: document.getElementById('step-upload'),    delay: 0    },
+        { el: document.getElementById('step-tile'),      delay: 900  },
+        { el: document.getElementById('step-inference'), delay: 2000 },
+        { el: document.getElementById('step-nms'),       delay: 3400 },
+        { el: document.getElementById('step-render'),    delay: 4800 },
+      ];
+
+      function activateStep(index) {
+        if (index >= steps.length) return;
+        var step = steps[index];
+        // Mark previous step done
+        if (index > 0) {
+          steps[index - 1].el.classList.remove('active');
+          steps[index - 1].el.classList.add('done');
+        }
+        step.el.classList.add('active');
+      }
+
+      if (form && overlay) {
+        form.addEventListener('submit', function (e) {
+          // Guard: don't show HUD if no file selected
+          if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            return;
+          }
+
+          // Show overlay
+          overlay.classList.add('active');
+
+          // Disable submit button to prevent double-submit
+          var btn = document.getElementById('analyse-btn');
+          if (btn) { btn.disabled = true; }
+
+          // Sequentially activate HUD steps
+          steps.forEach(function (s, i) {
+            setTimeout(function () { activateStep(i); }, s.delay);
+          });
+        });
+      }
+    })();
   </script>
 
 </body>

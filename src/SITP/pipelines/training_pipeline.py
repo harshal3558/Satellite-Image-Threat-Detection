@@ -4,7 +4,7 @@ Training pipeline for the Satellite Image Threat Detection project.
 Orchestrates:
   1. DataIngestion   — load xView annotations & build train/val image split
   2. DataTransformation — chip GeoTIFFs into YOLO-format image + label files
-  3. ModelTrainer    — train YOLO11 and validate the best checkpoint
+  3. ModelTrainer    — train YOLOv8 and validate the best checkpoint
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ class TrainingPipeline:
         Returns
         -------
         Path
-            Path to the best YOLO11 weight file (``best.pt``).
+            Path to the best YOLOv8 weight file (``best.pt``).
         """
         try:
             seed_everything(self.ingestion_config.seed)

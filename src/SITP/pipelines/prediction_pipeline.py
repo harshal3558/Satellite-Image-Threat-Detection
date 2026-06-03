@@ -3,7 +3,7 @@ Prediction pipeline for the Satellite Image Threat Detection project.
 
 Provides:
   PredictPipeline  — runs tiled inference on a large GeoTIFF using the
-                     trained YOLO11 model.
+                     trained YOLOv8 model.
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 # Satellite Image Threat Detection (SITP)
 
-An end-to-end Machine Learning pipeline and web application designed to ingest the **xView dataset**, preprocess large-format GeoTIFF imagery into training chips, fine-tune a **YOLO11** model, and run tiled object detection to identify threat classes in satellite imagery.
+An end-to-end Machine Learning pipeline and web application designed to ingest the **xView dataset**, preprocess large-format GeoTIFF imagery into training chips, fine-tune a **YOLOv8** model, and run tiled object detection to identify threat classes in satellite imagery.
 
 ---
 
@@ -10,12 +10,12 @@ The pipeline consists of four major stages, structured cleanly under the `src/SI
 
 ```
 [ Data Ingestion ] ──> [ Data Transformation ] ──> [ Model Training ] ──> [ Web App Inference ]
- (Split images)          (Sliding-window chips)     (YOLO11 fine-tuning)   (Tiled NMS & visualization)
+ (Split images)          (Sliding-window chips)     (YOLOv8 fine-tuning)   (Tiled NMS & visualization)
 ```
 
 1. **Data Ingestion** (`data_ingestion.py`): Parses the raw xView GeoJSON labels, verifies images on disk, and splits the dataset at the *image* level (80/20 train/validation split) to prevent data leakage.
 2. **Data Transformation** (`data_transformation.py`): Uses sliding-window tiling (512×512 pixels, stride 364) to slice large satellite images. Applies training-time augmentations (CLAHE, brightness, flips) via Albumentations.
-3. **Model Training** (`model_trainer.py`): Ingests the chipped dataset and fine-tunes a `yolo11m.pt` model, tracking mAP50 and mAP50-95 metrics.
+3. **Model Training** (`model_trainer.py`): Ingests the chipped dataset and fine-tunes a `yolov8m.pt` model, tracking mAP50 and mAP50-95 metrics.
 4. **Web App Interface** (`application.py`): Allows users to upload a GeoTIFF image, choose custom confidence & IoU thresholds, run tiled model predictions, deduplicate boxes with batched non-maximum suppression (NMS), and view detailed detection logs.
 
 ---
@@ -56,14 +56,14 @@ data/
 ## 🚀 Running the Pipeline
 
 ### Step 1: Model Training
-To execute the end-to-end training pipeline (Ingestion ➔ Transformation ➔ YOLO11 Training):
+To execute the end-to-end training pipeline (Ingestion ➔ Transformation ➔ YOLOv8 Training):
 ```bash
 python main.py
 ```
 This will:
 - Partition your images into train/validation sets.
 - Generate YOLO chips inside the `xview_yolo/` directory.
-- Run YOLO11 training and save checkpoints under `xview_yolo/satellite_detector/weights/best.pt`.
+- Run YOLOv8 training and save checkpoints under `xview_yolo/satellite_detector/weights/best.pt`.
 
 ### Step 2: Launch the Web App
 After training is complete (or after obtaining a checkpoint):

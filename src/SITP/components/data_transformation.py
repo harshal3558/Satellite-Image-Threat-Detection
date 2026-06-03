@@ -52,7 +52,7 @@ class DataTransformationConfig:
 class DataTransformation:
     """
     Slices GeoTIFF images into fixed-size chips, writes YOLO labels, and
-    produces a ``data.yaml`` that YOLO11 can consume directly.
+    produces a ``data.yaml`` that YOLOv8 can consume directly.
     """
 
     def __init__(self, config: DataTransformationConfig | None = None) -> None:
