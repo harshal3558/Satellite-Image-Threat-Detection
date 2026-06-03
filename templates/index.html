@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SITP — Satellite Image Threat Detection</title>
+  <meta name="description" content="AI-powered satellite image threat detection using YOLO11. Upload a GeoTIFF and instantly detect objects and threats." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght=400;600;700;900&family=Inter:wght=300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+  <!-- ── Starfield Background ─────────────────────────────────────────── -->
+  <div class="starfield" id="starfield">
+    <!-- Starfield divs created inline for pure styling without main.js -->
+    <div class="star" style="left:12%; top:25%; --dur:4s; --delay:1s; width:2px; height:2px;"></div>
+    <div class="star" style="left:35%; top:60%; --dur:5s; --delay:0s; width:1px; height:1px;"></div>
+    <div class="star" style="left:58%; top:15%; --dur:3s; --delay:2s; width:3px; height:3px;"></div>
+    <div class="star" style="left:72%; top:80%; --dur:6s; --delay:1.5s; width:2px; height:2px;"></div>
+    <div class="star" style="left:88%; top:40%; --dur:4.5s; --delay:0.5s; width:1.5px; height:1.5px;"></div>
+    <div class="star" style="left:20%; top:75%; --dur:5.5s; --delay:3s; width:2.5px; height:2.5px;"></div>
+    <div class="star" style="left:45%; top:30%; --dur:3.5s; --delay:1s; width:1px; height:1px;"></div>
+    <div class="star" style="left:92%; top:85%; --dur:4s; --delay:2.5s; width:2px; height:2px;"></div>
+  </div>
+  <div class="grid-overlay"></div>
+
+  <!-- ── Header ───────────────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="20" cy="20" r="18" stroke="#00ff88" stroke-width="1.5" stroke-dasharray="4 2"/>
+            <circle cx="20" cy="20" r="10" stroke="#00d4ff" stroke-width="1.5"/>
+            <circle cx="20" cy="20" r="3" fill="#00ff88"/>
+            <line x1="20" y1="2" x2="20" y2="10" stroke="#00ff88" stroke-width="1.5"/>
+            <line x1="20" y1="30" x2="20" y2="38" stroke="#00ff88" stroke-width="1.5"/>
+            <line x1="2" y1="20" x2="10" y2="20" stroke="#00ff88" stroke-width="1.5"/>
+            <line x1="30" y1="20" x2="38" y2="20" stroke="#00ff88" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <span class="logo-main">SITP</span>
+          <span class="logo-sub">Satellite Threat Intelligence</span>
+        </div>
+      </div>
+      <nav class="nav-pills">
+        <span class="nav-pill active">Detect</span>
+        <a href="#about-section" class="nav-pill" style="text-decoration:none;">System Info</a>
+      </nav>
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        <span>System Online</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Hero ─────────────────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-tag">YOLO11 · xView Dataset · Real-Time Detection</div>
+      <h1 class="hero-title">
+        Satellite <span class="gradient-text">Threat</span><br/>
+        Detection AI
+      </h1>
+      <p class="hero-desc">
+        Upload a GeoTIFF satellite image and let the AI instantly locate
+        and classify objects across 60+ threat categories using tiled
+        inference with batched NMS.
+      </p>
+      <div class="hero-stats">
+        <div class="stat"><span class="stat-val">60+</span><span class="stat-lbl">Object Classes</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><span class="stat-val">512px</span><span class="stat-lbl">Tile Size</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><span class="stat-val">NMS</span><span class="stat-lbl">Deduplication</span></div>
+      </div>
+    </div>
+    <div class="radar-widget">
+      <div class="radar-ring ring1"></div>
+      <div class="radar-ring ring2"></div>
+      <div class="radar-ring ring3"></div>
+      <div class="radar-sweep"></div>
+      <div class="radar-center"></div>
+      <div class="radar-blip" style="top:30%;left:65%"></div>
+      <div class="radar-blip" style="top:55%;left:40%"></div>
+      <div class="radar-blip" style="top:70%;left:70%"></div>
+    </div>
+  </section>
+
+  <!-- ── Upload Panel ──────────────────────────────────────────────────── -->
+  <main class="main-panel">
+
+    {% if not success %}
+    <form action="/" method="POST" enctype="multipart/form-data">
+      <!-- Controls -->
+      <div class="controls-row">
+        <div class="control-group">
+          <label class="ctrl-label" for="conf-slider">
+            Confidence Threshold: <span id="conf-val">{{ conf_val|default(0.25) }}</span>
+          </label>
+          <input type="range" name="conf" id="conf-slider" min="0.05" max="0.95" step="0.05" value="{{ conf_val|default(0.25) }}" class="slider" oninput="document.getElementById('conf-val').textContent = parseFloat(this.value).toFixed(2)" />
+        </div>
+        <div class="control-group">
+          <label class="ctrl-label" for="iou-slider">
+            IoU Threshold: <span id="iou-val">{{ iou_val|default(0.45) }}</span>
+          </label>
+          <input type="range" name="iou" id="iou-slider" min="0.1" max="0.9" step="0.05" value="{{ iou_val|default(0.45) }}" class="slider" oninput="document.getElementById('iou-val').textContent = parseFloat(this.value).toFixed(2)" />
+        </div>
+      </div>
+
+      <!-- Drop zone (Simple form input style since external JS is removed) -->
+      <div class="dropzone" id="dz-zone" onclick="document.getElementById('file-input').click()">
+        <input type="file" name="file" id="file-input" accept=".tif,.tiff" hidden onchange="if(this.files && this.files[0]) { document.getElementById('dz-file-status').style.display = 'flex'; document.getElementById('dz-file-name-text').textContent = 'Ready for Scan: ' + this.files[0].name; document.getElementById('dz-zone').style.borderColor = 'var(--accent-green)'; document.getElementById('dz-zone').style.boxShadow = 'var(--shadow-glow-g)'; }" required />
+        <div class="dz-icon">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="12" width="56" height="40" rx="4" stroke="currentColor" stroke-width="2" stroke-dasharray="6 3"/>
+            <path d="M32 44V28M32 28L24 36M32 28L40 36" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="20" y="8" width="24" height="8" rx="2" fill="currentColor" opacity="0.2"/>
+            <text x="32" y="15" text-anchor="middle" font-size="6" fill="currentColor" font-family="monospace">.TIF</text>
+          </svg>
+        </div>
+        <p class="dz-title">Click to upload GeoTIFF image</p>
+        <p class="dz-sub">Select a .tif / .tiff file from your filesystem</p>
+        <p class="dz-hint">Supports sizes up to 500 MB</p>
+        <div class="dz-file-status" id="dz-file-status" style="display:none; align-items:center; justify-content:center; gap:8px; margin-top:12px; font-size:0.85rem; color:var(--accent-green)">
+          <span class="status-dot" style="background-color:var(--accent-green); box-shadow:0 0 10px var(--accent-green)"></span>
+          <strong id="dz-file-name-text"></strong>
+        </div>
+      </div>
+
+      <!-- Submit button -->
+      <button type="submit" class="analyse-btn" id="analyse-btn">
+        <span class="btn-icon">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M11 8v3l2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </span>
+        Run Threat Analysis
+      </button>
+    </form>
+    {% endif %}
+
+    <!-- ── Results Section ──────────────────────────────────────────────── -->
+    {% if success %}
+    <section class="results-section" id="results-section">
+      <div class="results-header">
+        <h2 class="results-title">
+          <svg viewBox="0 0 24 24" fill="none" width="22" height="22"><path d="M9 12l2 2 4-4" stroke="#00ff88" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="#00ff88" stroke-width="2"/></svg>
+          Analysis Complete
+        </h2>
+        <a href="/" class="reset-btn" style="text-decoration:none;">New Analysis</a>
+      </div>
+
+      <!-- Stats bar -->
+      <div class="stats-bar">
+        <div class="stat-card">
+          <span class="sc-val">{{ total_detections }}</span>
+          <span class="sc-lbl">Threats Found</span>
+        </div>
+        <div class="stat-card">
+          <span class="sc-val">{{ avg_confidence }}</span>
+          <span class="sc-lbl">Avg Confidence</span>
+        </div>
+        <div class="stat-card">
+          <span class="sc-val">{{ unique_classes }}</span>
+          <span class="sc-lbl">Unique Classes</span>
+        </div>
+      </div>
+
+      {% if img_metadata %}
+      <!-- Image Metadata Strip -->
+      <div class="metadata-strip">
+        <div class="meta-item">
+          <span class="meta-label">Target File:</span>
+          <span class="meta-value" style="color:var(--accent-green)">{{ img_metadata.filename }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Resolution:</span>
+          <span class="meta-value">{{ img_metadata.width }} × {{ img_metadata.height }} px</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Bands:</span>
+          <span class="meta-value">{{ img_metadata.bands }} ch</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Size:</span>
+          <span class="meta-value">{{ img_metadata.size }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Format:</span>
+          <span class="meta-value">{{ img_metadata.driver }}</span>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Image viewer -->
+      <div class="image-viewer">
+        <div class="viewer-tabs">
+          <span class="vtab active">Detections</span>
+        </div>
+        <div class="image-canvas">
+          <img class="sat-img" src="data:image/jpeg;base64,{{ result_image }}" alt="Detection result" />
+          <div class="image-watermark">SITP · Classified</div>
+        </div>
+      </div>
+
+      <!-- Class breakdown table -->
+      <div class="breakdown-panel">
+        <h3 class="breakdown-title">Class Breakdown</h3>
+        <div class="breakdown-table">
+          {% if not class_breakdown %}
+            <p style="color:var(--text-secondary);font-size:0.82rem;">No classes detected.</p>
+          {% else %}
+            {% for item in class_breakdown %}
+            <div class="brow">
+              <div class="brow-label">{{ item.name }}</div>
+              <div class="brow-bar-bg">
+                <div class="brow-bar-fill" style="width: {{ item.percentage }}%"></div>
+              </div>
+              <div class="brow-count">{{ item.count }}</div>
+            </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Detections table -->
+      <div class="detections-panel">
+        <h3 class="breakdown-title">Detection Log ({{ detections|length }})</h3>
+        <div class="det-table-wrapper">
+          <table class="det-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Class</th>
+                <th>Confidence</th>
+                <th>X1</th><th>Y1</th><th>X2</th><th>Y2</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if not detections %}
+                <tr><td colspan="7" style="text-align:center;color:var(--text-dim);">No objects detected.</td></tr>
+              {% else %}
+                {% for det in detections %}
+                <tr>
+                  <td>{{ det.idx }}</td>
+                  <td><span style="color:var(--accent-blue)">{{ det.class_name }}</span></td>
+                  <td><span class="conf-badge {{ det.badge_class }}">{{ det.score }}</span></td>
+                  <td>{{ det.x1 }}</td>
+                  <td>{{ det.y1 }}</td>
+                  <td>{{ det.x2 }}</td>
+                  <td>{{ det.y2 }}</td>
+                </tr>
+                {% endfor %}
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- Error card -->
+    {% if error %}
+    <div class="error-card">
+      <div class="error-icon">⚠</div>
+      <p class="error-title">Detection Failed</p>
+      <p class="error-msg">{{ error }}</p>
+      <a href="/" class="reset-btn" style="text-decoration:none; display:inline-block; margin-top:10px;">Try Again</a>
+    </div>
+    {% endif %}
+
+  </main>
+
+  <!-- ── About / System Info ───────────────────────────────────────────── -->
+  <section class="about-section" id="about-section">
+    <div class="about-inner">
+      <h2 class="about-title">System Architecture</h2>
+      <div class="arch-grid">
+        <div class="arch-card">
+          <div class="arch-icon">📡</div>
+          <h3>Data Ingestion</h3>
+          <p>Loads xView GeoJSON annotations and GeoTIFF images. Performs reproducible image-level train/val split at 80/20.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-icon">✂️</div>
+          <h3>Data Transformation</h3>
+          <p>Sliding-window chipping (512×512, stride 364). Albumentations augmentation pipeline for training chips.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-icon">🧠</div>
+          <h3>Model Training</h3>
+          <p>YOLO11m pretrained weights fine-tuned on xView for 50 epochs with mosaic, copy-paste, and rotation augmentation.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-icon">🔍</div>
+          <h3>Tiled Inference</h3>
+          <p>Large images divided into overlapping tiles. All detections merged into global coordinates with batched NMS deduplication.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ───────────────────────────────────────────────────────── -->
+  <footer class="footer">
+    <p>SITP · Satellite Image Threat Detection · YOLO11 + xView · Built by Harshal</p>
+  </footer>
+
+  <!-- ── Loading Overlay ────────────────────────────────────────────── -->
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-card">
+      <div class="scan-animation">
+        <div class="scan-grid"></div>
+        <div class="scan-line"></div>
+      </div>
+      <h3 class="loading-title">THREAT DETECTION HUD</h3>
+      <div class="loading-steps">
+        <div class="ls" id="step-upload">
+          <div class="ls-dot"></div>
+          <span>Image Uploaded Successfully</span>
+        </div>
+        <div class="ls" id="step-tile">
+          <div class="ls-dot"></div>
+          <span>Performing Tiled Division (512px)</span>
+        </div>
+        <div class="ls" id="step-inference">
+          <div class="ls-dot"></div>
+          <span>Running YOLO11 Neural Inference</span>
+        </div>
+        <div class="ls" id="step-nms">
+          <div class="ls-dot"></div>
+          <span>Batched NMS Deduplication</span>
+        </div>
+        <div class="ls" id="step-render">
+          <div class="ls-dot"></div>
+          <span>Generating Visual HUD Overlay</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const form = document.querySelector('form');
+      if (form) {
+        form.addEventListener('submit', function(e) {
+          const fileInput = document.getElementById('file-input');
+          if (!fileInput.files || fileInput.files.length === 0) {
+            return;
+          }
+          
+          const overlay = document.getElementById('loading-overlay');
+          overlay.classList.add('active');
+          
+          const stepUpload = document.getElementById('step-upload');
+          const stepTile = document.getElementById('step-tile');
+          const stepInference = document.getElementById('step-inference');
+          const stepNms = document.getElementById('step-nms');
+          const stepRender = document.getElementById('step-render');
+          
+          // Step 1: Upload completes and turns green immediately on HUD start
+          stepUpload.classList.add('active');
+          setTimeout(() => {
+            stepUpload.classList.remove('active');
+            stepUpload.classList.add('done');
+            
+            // Step 2: Tiling starts
+            stepTile.classList.add('active');
+          }, 800);
+          
+          setTimeout(() => {
+            stepTile.classList.remove('active');
+            stepTile.classList.add('done');
+            
+            // Step 3: Neural Inference starts
+            stepInference.classList.add('active');
+          }, 1800);
+          
+          setTimeout(() => {
+            stepInference.classList.remove('active');
+            stepInference.classList.add('done');
+            
+            // Step 4: NMS starts
+            stepNms.classList.add('active');
+          }, 3200);
+          
+          setTimeout(() => {
+            stepNms.classList.remove('active');
+            stepNms.classList.add('done');
+            
+            // Step 5: Rendering starts
+            stepRender.classList.add('active');
+          }, 4500);
+        });
+      }
+    });
+  </script>
+
+</body>
+</html>

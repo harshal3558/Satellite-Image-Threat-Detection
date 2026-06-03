@@ -1,0 +1,14 @@
+ultralytics>=8.0.0
+rasterio>=1.3.0
+geopandas>=0.14.0
+albumentations>=1.3.0
+torch>=2.0.0
+torchvision>=0.15.0
+shapely>=2.0.0
+tqdm>=4.65.0
+pyyaml>=6.0
+opencv-python>=4.8.0
+pandas>=2.0.0
+numpy>=1.24.0
+# -e .
+flask>=3.0.0
