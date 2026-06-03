@@ -95,6 +95,9 @@ Navigate to `http://localhost:5000`.
 
 ```
 ├── data/                      # Raw xView dataset directory
+│   ├── train_images/
+│   └── train_labels/
+│       └── xView_train.geojson
 ├── src/
 │   └── SITP/
 │       ├── components/        # Pipeline modular stages
@@ -102,20 +105,36 @@ Navigate to `http://localhost:5000`.
 │       │   ├── data_transformation.py
 │       │   ├── model_trainer.py
 │       │   └── model_monitoring.py
-│       ├── pipelines/         # Pipelines runner definitions
+│       ├── pipelines/         # Pipeline runner definitions
 │       │   ├── training_pipeline.py
 │       │   └── prediction_pipeline.py
 │       ├── exception.py       # Custom exception handler
 │       ├── logger.py          # Logger module
 │       └── utils.py           # Helper utilities
+├── notebooks/                 # Jupyter notebooks for EDA & experimentation
+│   ├── satellite-image-threat-detection.ipynb
+│   ├── satellite-image-threat-detection-enhanced.ipynb
+│   ├── improved_satellite_image_threat_detection.ipynb
+│   ├── chatgpt-update.ipynb
+│   └── add_nms_to_notebook.py
+├── artifacts/                 # Intermediate pipeline outputs
+│   └── raw_annotations.csv    # Parsed xView annotations
+├── xview_yolo/                # YOLO-formatted dataset & training output
+│   └── satellite_detector/
+│       └── weights/
+│           └── best.pt        # Best YOLOv8 checkpoint (post-training)
+├── logs/                      # Pipeline execution logs
+├── uploads/                   # Temporary storage for web app uploads
 ├── templates/
 │   └── index.html             # Web app user interface
 ├── static/
 │   └── css/
-│       └── style.css          # Space/military tactical styles
-├── application.py             # Flask web server
-├── main.py                    # Training entry point
+│       └── style.css          # Military/tactical HUD styles
+├── best.pt                    # Exported model checkpoint (root-level copy)
+├── application.py             # Flask web server entry point
+├── main.py                    # Training pipeline entry point
+├── template.py                # Project scaffolding script
 ├── Dockerfile                 # Docker configuration
 ├── requirements.txt           # Python library dependencies
-└── setup.py                   # Packaging configuration
+└── setup.py                   # Package configuration
 ```
