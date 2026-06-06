@@ -1,0 +1,91 @@
+# ── Version control ───────────────────────────────────────────────────────────
+.git
+.gitignore
+
+# ── Python cache & compiled files ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+senv/
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROJECT-SPECIFIC — large / not needed for inference
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Raw xView dataset (GBs of GeoTIFF files — not needed for inference) ───────
+data/
+
+# ── YOLO training run outputs (chips, labels, training weights) ───────────────
+xview_yolo/
+
+# ── Jupyter notebooks (not part of the Flask web app) ────────────────────────
+notebooks/
+*.ipynb
+
+# ── Documentation (not needed inside the container) ──────────────────────────
+*.md
+*.pdf
+*.txt
+!requirements.txt
+
+# ── Intermediate pipeline artifacts ──────────────────────────────────────────
+# raw_annotations.csv (~18 MB), results.csv, curve PNGs — not needed at inference
+artifacts/
+
+# ── Exported model formats (very large — only best.pt is used by the app) ─────
+*.engine
+*.onnx
+
+# ── Runtime-generated directories (created fresh by Dockerfile RUN mkdir) ─────
+logs/
+uploads/
+
+# ── IDE / editor files ────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.gemini/
+*.code-workspace
+
+# ── OS metadata ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Environment & secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+*.env
+.envrc
+
+# ── Type checkers / linters cache ────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.tox/
+.nox/
+
+# ── Test files ────────────────────────────────────────────────────────────────
+tests/
+test_*.py
+*_test.py
+
+# ── Build / dist artifacts ───────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# ── DVC ───────────────────────────────────────────────────────────────────────
+.dvc/
+.dvcignore
