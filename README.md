@@ -74,32 +74,90 @@ Open `http://localhost:5000` in your web browser. You will see a dark military-t
 
 ---
 
-## 📊 Model Evaluation & Performance Metrics
+## 📊 Model Evaluation & Performance Metrics & Their Operational Importance
 
-The model is evaluated on the validation split (1,926 images containing 148,178 instances) using standard object detection metrics. Below are the actual values obtained after training `yolov8m.pt` for 50 epochs:
+Evaluating object detection models on high-resolution satellite imagery presents unique challenges due to extreme scale variations (objects ranging from 10 to 500 pixels), high background clutter (forests, desert terrain, urban shadows), and severe class imbalance. 
 
-### Global Validation Metrics (All Classes Combined)
+The **SITP pipeline** evaluates model performance on the validation split (**1,926 image chips** containing **148,178 ground-truth target instances**) using standard computer vision metrics alongside custom pipeline logging (`src/SITP/components/model_monitoring.py`).
 
-| Evaluation Metric | Description | Value |
-|-------------------|-------------|-------|
-| **Precision (Box P)** | Percentage of predicted bounding boxes that correctly identify a threat class. | **32.7%** (0.327) |
-| **Recall (Box R)** | Percentage of actual threat objects correctly detected by the model. | **25.5%** (0.255) |
-| **mAP50** | Mean Average Precision at an Intersection over Union (IoU) threshold of 0.50. | **20.9%** (0.209) |
-| **mAP50-95** | Mean Average Precision averaged over IoU thresholds from 0.50 to 0.95 (measures localization quality). | **10.9%** (0.109) |
+---
+
+### 1. Global Performance Metrics Summary
+
+Below are the key benchmark metrics obtained after fine-tuning **YOLOv8m** for 50 epochs on the xView dataset:
+
+| Metric | Formula / Standard | Empirical Value | Operational Role & Importance in Project |
+|---|---|---|---|
+| **Precision (Box P)** | $\frac{TP}{TP + FP}$ | **32.7%** (`0.327`) | **Minimizes False Alarms:** Ensures military/defense operators are not overwhelmed by false detections across large-scale satellite surveys. |
+| **Recall (Box R)** | $\frac{TP}{TP + FN}$ | **25.5%** (`0.255`) | **Minimizes Missed Threats:** Measures the pipeline's ability to detect high-value target assets (planes, ships, vehicles) in complex terrain. |
+| **mAP50** | Mean AP at $\text{IoU} = 0.50$ | **20.9%** (`0.209`) | **Primary Detection Benchmark:** Overall object recognition accuracy across all 60+ classes at standard 50% overlap. |
+| **mAP50-95** | Mean AP over $\text{IoU} \in [0.50, 0.95]$ | **10.9%** (`0.109`) | **Localization Precision:** Evaluates exact bounding box alignment, critical for geospatial positioning and intelligence mapping. |
 
 > [!NOTE]
-> The xView dataset is a highly imbalanced, complex satellite imagery dataset featuring extremely small objects (e.g. cars, trailers, boats) and high background clutter. Achieving ~21% mAP50 is strong and aligns with state-of-the-art performance benchmarks on this subset.
+> **Benchmarking Context:** xView is widely recognized as one of the most challenging overhead satellite benchmarks. Objects are extremely small (down to $10 \times 10$ pixels), with intense class imbalance. An mAP50 of **~21%** aligns with state-of-the-art performance on this benchmark subset.
 
-### Representative Class-Specific Performance
+---
 
-The pipeline evaluates each of the classes individually. Here is a subset of representative classes:
+### 2. In-Depth Metric Analysis & Importance in Satellite Threat Detection
 
-*   **Cargo Plane**: mAP50 = `90.5%` | mAP50-95 = `56.9%`
-*   **Passenger Car**: mAP50 = `87.3%` | mAP50-95 = `48.3%`
-*   **Small Car**: mAP50 = `62.9%` | mAP50-95 = `23.0%`
-*   **Building**: mAP50 = `61.0%` | mAP50-95 = `31.1%`
-*   **Container Ship**: mAP50 = `72.2%` | mAP50-95 = `39.0%`
-*   **Helicopter**: mAP50 = `25.6%` | mAP50-95 = `17.6%`
+#### 🎯 A. Precision ($\text{Box P}$) — *False Alarm Rate Control*
+* **Definition:** The proportion of predicted threat bounding boxes that truly correspond to ground-truth threat objects.
+* **Importance in the Project:**
+  * **Analyst Workload Management:** When scanning gigapixel satellite images, a low-precision model generates thousands of false alarms (e.g., mistaking building shadows, container stacks, or terrain patterns for threats). High precision ensures analyst time is focused on genuine targets.
+  * **System Trust:** In defense intelligence, frequent false alarms lead to alarm fatigue and reduced user trust in automated AI systems.
+
+#### 🔍 B. Recall ($\text{Box R}$) — *Missed Threat Prevention*
+* **Definition:** The proportion of actual ground-truth threat objects correctly detected by the system.
+* **Importance in the Project:**
+  * **Strategic Risk Reduction:** Missing a critical threat asset (e.g., an undetected stealth aircraft, mobile missile launcher, or warship) has severe tactical consequences. 
+  * **Confidence Tuning:** In high-stakes intelligence operations, operators can intentionally lower the confidence threshold (`conf`) in the web application (`application.py`) to boost Recall, accepting more candidate detections to ensure zero missed threats.
+
+#### ⚖️ C. Precision-Recall Trade-off & Operational Slider Controls
+* **Definition:** The inverse relationship between Precision and Recall as the decision confidence threshold ($\tau_{\text{conf}}$) is adjusted.
+* **Importance in the Project:**
+  * The Flask web interface (`application.py`) exposes interactive control sliders for **Confidence Threshold** and **IoU Threshold**.
+  * **Surveillance Scenario (High Sensitivity):** Lower `conf` (e.g., `0.15`) $\rightarrow$ Higher Recall $\rightarrow$ Scans every potential threat.
+  * **Target Verification (High Specificity):** Higher `conf` (e.g., `0.50`) $\rightarrow$ Higher Precision $\rightarrow$ Reports only confirmed, high-certainty targets.
+
+#### 📐 D. Intersection over Union (IoU) & Tiled Deduplication
+* **Definition:** Spatial overlap ratio between predicted ($\mathbf{B}_p$) and ground truth ($\mathbf{B}_g$) boxes:
+  $$\text{IoU} = \frac{\text{Area}(\mathbf{B}_p \cap \mathbf{B}_g)}{\text{Area}(\mathbf{B}_p \cup \mathbf{B}_g)}$$
+* **Importance in the Project:**
+  * **Tile Border Deduplication:** The pipeline processes large GeoTIFF imagery using sliding windows ($512 \times 512$ tiles with 100px overlap). Objects lying on tile boundaries are detected multiple times.
+  * **Batched Non-Maximum Suppression (NMS):** Using `torchvision.ops.batched_nms` with an IoU threshold (`iou=0.45` default), the system merges overlapping bounding boxes across tile borders into single global-coordinate detections.
+
+#### 📈 E. Mean Average Precision (mAP50 & mAP50-95)
+* **mAP50 (Detection Completeness):** Measures average precision across all recall levels at a standard 50% IoU match score. Gives an overall rating of object detection capability across diverse target types.
+* **mAP50-95 (Localization Quality):** Averaged over 10 IoU thresholds ($0.50, 0.55, \dots, 0.95$). Crucial for precise geospatial coordinates: a box with 50% IoU confirms presence, but 90% IoU provides exact coordinates needed for geolocation mapping and targeted tracking.
+
+#### 🏷️ F. Per-Class Average Precision (Class Imbalance Mitigation)
+* **Definition:** Class-specific AP metrics evaluated independently for each xView object category (`ModelMonitoring.inspect_per_class_performance`).
+* **Importance in the Project:**
+  * Global mAP can mask poor performance on rare strategic targets if common classes (like passenger cars) dominate the dataset.
+  * Per-class tracking allows monitoring specific high-value assets independently.
+
+---
+
+### 3. Representative Class-Specific Performance
+
+| Threat / Asset Class | mAP50 | mAP50-95 | Tactical Relevance & Characteristic |
+|---|---|---|---|
+| ✈️ **Cargo Plane** | **90.5%** | **56.9%** | Large strategic asset with distinct structural geometry and runway background contrast. |
+| 🚗 **Passenger Car** | **87.3%** | **48.3%** | High training density; distinct vehicle silhouette on paved roads. |
+| 🚢 **Container Ship** | **72.2%** | **39.0%** | Distinct maritime signatures; clear water background separation. |
+| 🚙 **Small Car** | **62.9%** | **23.0%** | Highly dense in urban parking lots; prone to occlusion by nearby buildings. |
+| 🏢 **Building** | **61.0%** | **31.1%** | Fixed infrastructure; large spatial variation requiring precise box boundaries. |
+| 🚁 **Helicopter** | **25.6%** | **17.6%** | Low sample count; rotor shadows and camouflage make detection challenging. |
+
+---
+
+### 4. Training Loss Metrics & Convergence Tracking
+
+During model training (`ModelTrainer`), YOLOv8 tracks three primary loss components:
+
+1. **Box Loss ($\mathcal{L}_{\text{box}}$ - Complete IoU Loss):** Optimizes bounding box location, size, and aspect ratio alignment for satellite targets.
+2. **Class Loss ($\mathcal{L}_{\text{cls}}$ - BCE Loss):** Measures classification accuracy across threat classes.
+3. **DFL Loss ($\mathcal{L}_{\text{dfl}}$ - Distribution Focal Loss):** Refines boundary regression for tiny or occluded objects in satellite imagery.
 
 ---
 

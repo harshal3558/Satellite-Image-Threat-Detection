@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/harsh/OneDrive/Desktop/Satellite-Image-Threat-Detection/runs/mlflow/625416148305340738/23aea0b717b041b3b592ccb97e847b7a/artifacts
+end_time: 1785227459983
+entry_point_name: ''
+experiment_id: '625416148305340738'
+lifecycle_stage: active
+run_id: 23aea0b717b041b3b592ccb97e847b7a
+run_name: satellite_detector
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1785227340063
+status: 3
+tags: []
+user_id: harsh
