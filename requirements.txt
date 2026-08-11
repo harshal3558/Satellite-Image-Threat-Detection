@@ -12,3 +12,8 @@ pandas>=2.0.0
 numpy>=1.24.0
 # -e .
 flask>=3.0.0
+gunicorn
+flask
+opencv-python-headless
+numpy
+werkzeug

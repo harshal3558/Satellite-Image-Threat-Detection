@@ -53,4 +53,5 @@ EXPOSE 5000
 # ── Start the application via gunicorn (production-grade WSGI server) ─────────
 # - 2 workers is safe for CPU-bound ML inference workload
 # - timeout 300s to handle large image inference time
-CMD ["gunicorn", "--workers", "2", "--timeout", "300", "--bind", "0.0.0.0:5000", "application:app"]
+# CMD ["gunicorn", "--workers", "2", "--timeout", "300", "--bind", "0.0.0.0:5000", "application:app"]
+CMD sh -c "gunicorn --workers 2 --timeout 300 --bind 0.0.0.0:${PORT:-5000} application:app"
