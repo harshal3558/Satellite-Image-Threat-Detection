@@ -154,7 +154,9 @@ best.pt
 # raw_annotations.csv (~18 MB), results.csv, curve PNGs generated during training
 /artifacts/
 
-# ── Sphinx / mkdocs docs build ────────────────────────────────────────────────
+# ── Documentation ─────────────────────────────────────────────────────────────
+docs/*
+!docs/screenshots/
 docs/_build/
 /site
 

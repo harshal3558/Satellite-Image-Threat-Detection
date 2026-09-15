@@ -1,11 +1,11 @@
 /* ============================================================
-   SITP — Satellite Image Threat Detection
+   SITP ΓÇö Satellite Image Threat Detection
    style.css  |  Dark military/space aesthetic
    ============================================================ */
 
-/* ── Google Fonts already loaded in HTML ── */
+/* ΓöÇΓöÇ Google Fonts already loaded in HTML ΓöÇΓöÇ */
 
-/* ── CSS Custom Properties ───────────────────────────────── */
+/* ΓöÇΓöÇ CSS Custom Properties ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 :root {
   --bg-deep:    #05080f;
   --bg-dark:    #090d1a;
@@ -36,7 +36,7 @@
   --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ── Reset & Base ────────────────────────────────────────── */
+/* ΓöÇΓöÇ Reset & Base ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html { scroll-behavior: smooth; }
@@ -50,7 +50,7 @@ body {
   line-height: 1.6;
 }
 
-/* ── Starfield ───────────────────────────────────────────── */
+/* ΓöÇΓöÇ Starfield ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .starfield {
   position: fixed;
   inset: 0;
@@ -81,7 +81,7 @@ body {
   background-size: 60px 60px;
 }
 
-/* ── Header ─────────────────────────────────────────────── */
+/* ΓöÇΓöÇ Header ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .header {
   position: sticky;
   top: 0;
@@ -188,7 +188,7 @@ body {
   50%       { opacity: 0.5; box-shadow: 0 0 2px var(--accent-green); }
 }
 
-/* ── Hero ────────────────────────────────────────────────── */
+/* ΓöÇΓöÇ Hero ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .hero {
   position: relative;
   z-index: 1;
@@ -270,7 +270,7 @@ body {
   background: var(--border);
 }
 
-/* ── Radar Widget ────────────────────────────────────────── */
+/* ΓöÇΓöÇ Radar Widget ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .radar-widget {
   position: relative;
   width: 260px;
@@ -345,7 +345,7 @@ body {
   50%       { opacity: 1;   transform: translate(-50%,-50%) scale(1.4); }
 }
 
-/* ── Main Panel ──────────────────────────────────────────── */
+/* ΓöÇΓöÇ Main Panel ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .main-panel {
   position: relative;
   z-index: 1;
@@ -354,7 +354,7 @@ body {
   padding: 0 24px;
 }
 
-/* ── Controls Row ────────────────────────────────────────── */
+/* ΓöÇΓöÇ Controls Row ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .controls-row {
   display: flex;
   gap: 32px;
@@ -403,7 +403,7 @@ body {
   box-shadow: 0 0 18px rgba(0, 212, 255, 0.7);
 }
 
-/* ── Drop Zone ───────────────────────────────────────────── */
+/* ΓöÇΓöÇ Drop Zone ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .dropzone {
   border: 2px dashed var(--border);
   border-radius: var(--radius-lg);
@@ -498,7 +498,7 @@ body {
   animation: fadeUp 0.3s ease;
 }
 
-/* ── Analyse Button ──────────────────────────────────────── */
+/* ΓöÇΓöÇ Analyse Button ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .analyse-btn {
   width: 100%;
   padding: 18px 32px;
@@ -550,7 +550,7 @@ body {
 
 .btn-icon svg { width: 20px; height: 20px; }
 
-/* ── Loading Overlay ─────────────────────────────────────────────── */
+/* ΓöÇΓöÇ Loading Overlay ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .loading-overlay {
   display: none;
   position: fixed;
@@ -692,7 +692,7 @@ body {
   50%       { opacity: 1; }
 }
 
-/* ── Results Section ─────────────────────────────────────── */
+/* ΓöÇΓöÇ Results Section ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .results-section {
   margin-top: 48px;
   animation: fadeUp 0.5s ease;
@@ -959,7 +959,7 @@ body {
 .conf-med  { background: rgba(255, 215, 0, 0.15);  color: #ffd700; }
 .conf-low  { background: rgba(255, 99, 71, 0.15);  color: #ff6347; }
 
-/* ── Error Card ──────────────────────────────────────────── */
+/* ΓöÇΓöÇ Error Card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .error-card {
   margin-top: 48px;
   background: rgba(255, 80, 60, 0.06);
@@ -993,7 +993,7 @@ body {
   margin-right: auto;
 }
 
-/* ── About Section ───────────────────────────────────────── */
+/* ΓöÇΓöÇ About Section ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .about-section {
   position: relative;
   z-index: 1;
@@ -1058,7 +1058,7 @@ body {
   line-height: 1.65;
 }
 
-/* ── Footer ──────────────────────────────────────────────── */
+/* ΓöÇΓöÇ Footer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .footer {
   position: relative;
   z-index: 1;
@@ -1069,7 +1069,7 @@ body {
   letter-spacing: 0.5px;
 }
 
-/* ── Scrollbar ───────────────────────────────────────────── */
+/* ΓöÇΓöÇ Scrollbar ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -1078,7 +1078,7 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
 
-/* ── Metadata Strip ──────────────────────────────────────── */
+/* ΓöÇΓöÇ Metadata Strip ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .metadata-strip {
   display: flex;
   background: var(--bg-card);
@@ -1112,7 +1112,7 @@ body {
   font-weight: 600;
 }
 
-/* ── Responsive ──────────────────────────────────────────── */
+/* ΓöÇΓöÇ Responsive ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 @media (max-width: 768px) {
   .hero {
     flex-direction: column;
@@ -1130,3 +1130,157 @@ body {
 
   .controls-row { flex-direction: column; gap: 20px; }
 }
+
+/* ── Engine Badge Row ──────────────────────────────────────────────────────── */
+.engine-badge-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.6rem 0 1rem;
+}
+.engine-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(0, 212, 255, 0.07);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 20px;
+  padding: 0.28rem 0.75rem;
+  font-size: 0.78rem;
+}
+.engine-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: 0 0 6px var(--accent-green);
+  flex-shrink: 0;
+}
+.engine-label {
+  color: var(--text-secondary);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+.engine-name {
+  color: var(--accent-blue);
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+/* ── High-Threat Brief Panel ──────────────────────────────────────────────── */
+.threat-brief-panel {
+  background: rgba(255, 68, 68, 0.06);
+  border: 1px solid rgba(255, 68, 68, 0.25);
+  border-left: 3px solid #ff4444;
+  border-radius: var(--radius-md);
+  padding: 1rem 1.2rem;
+  margin: 0 0 1.2rem;
+}
+.tbp-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: #ff6666;
+  font-weight: 700;
+}
+.tbp-count {
+  margin-left: auto;
+  background: rgba(255, 68, 68, 0.15);
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  border-radius: 12px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.7rem;
+  color: #ff8888;
+}
+.tbp-body {
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  line-height: 1.65;
+  margin: 0 0 0.75rem;
+}
+.tbp-objects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.tbp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(255, 68, 68, 0.1);
+  border: 1px solid rgba(255, 68, 68, 0.25);
+  border-radius: 20px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+  color: #ff9999;
+}
+.tbp-tag strong {
+  color: #ff4444;
+  font-weight: 700;
+}
+
+/* ── Latency Tracker Panel ────────────────────────────────────────────────── */
+.latency-panel {
+  background: rgba(0, 212, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.2rem;
+  margin: 0 0 1.2rem;
+}
+.lp-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--accent-blue);
+  font-weight: 700;
+}
+.lp-total {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0;
+}
+.lp-phases {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.lp-phase-top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+}
+.lp-phase-name {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.lp-phase-time {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.lp-bar-bg {
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.lp-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+  box-shadow: 0 0 8px currentColor;
+}
+

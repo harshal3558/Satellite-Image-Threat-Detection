@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import base64
 import os
+import time
 from pathlib import Path
 
 import cv2
@@ -21,7 +22,7 @@ from werkzeug.utils import secure_filename
 
 from ultralytics import YOLO
 
-from src.SITP.logger import logging
+from src.SITP.logger import backend_logger, detection_logger, log_detection_details, logging
 from src.SITP.pipelines.prediction_pipeline import PredictPipeline
 from src.SITP.utils import normalize_to_uint8
 
@@ -36,14 +37,27 @@ app.config["UPLOAD_FOLDER"] = "uploads"
 ALLOWED_EXTENSIONS = {"tif", "tiff"}
 
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+backend_logger.info("Initializing Flask Web Application & Inference Service")
 
-# Load class names from the trained model at startup
+# Warm PredictPipeline instance & class names loaded at startup
+_pipeline: PredictPipeline | None = None
 _CLASS_NAMES: dict[int, str] = {}
-if Path("best.pt").exists():
-    _model_meta = YOLO("best.pt")
-    _CLASS_NAMES = _model_meta.names or {}
-    del _model_meta  # free memory — the pipeline loads its own model
-    logging.info(f"Loaded {len(_CLASS_NAMES)} class names from best.pt")
+if Path("best.onnx").exists():
+    _startup_model = "best.onnx"
+elif Path("best.pt").exists():
+    _startup_model = "best.pt"
+else:
+    _startup_model = None
+
+if _startup_model:
+    try:
+        _pipeline = PredictPipeline(model_path=_startup_model)
+        _CLASS_NAMES = _pipeline.model.names or {}
+        backend_logger.info(
+            f"Loaded warm PredictPipeline [{_pipeline.engine_type}] with {len(_CLASS_NAMES)} classes from {_startup_model}"
+        )
+    except Exception as exc:
+        backend_logger.warning(f"Could not pre-load PredictPipeline on startup: {exc}")
 
 # Class colours (BGR for OpenCV) — cycles for any number of classes
 _PALETTE = [
@@ -159,13 +173,73 @@ def index():
         conf = float(request.form.get("conf", 0.25))
         iou  = float(request.form.get("iou",  0.45))
 
-        pipeline = PredictPipeline(conf=conf, iou=iou)
-        detections = pipeline.predict(filepath)
+        global _pipeline
+        if _pipeline is None:
+            _pipeline = PredictPipeline(conf=conf, iou=iou)
 
-        # Build visualization
+        # ── Inference with latency measurement ───────────────────────────
+        timings: dict = {}
+        _t_start = time.perf_counter()
+        detections = _pipeline.predict(filepath, conf=conf, iou=iou, _timings=timings)
+        inference_latency_s = time.perf_counter() - _t_start
+        inference_latency_str = (
+            f"{inference_latency_s * 1000:.0f} ms"
+            if inference_latency_s < 1.0
+            else f"{inference_latency_s:.2f} s"
+        )
+
+        # Build visualization with timing
+        _t_vis_start = time.perf_counter()
         image_rgb   = _tif_to_rgb(filepath)
         vis_image   = _draw_boxes(image_rgb, detections, class_names=_CLASS_NAMES)
         image_b64   = _to_base64(vis_image)
+        vis_latency_ms = round((time.perf_counter() - _t_vis_start) * 1000, 1)
+
+        t_load_ms = timings.get("t_load_ms", 0.0)
+        t_infer_ms = timings.get("t_inference_ms", 0.0)
+        t_nms_ms = timings.get("t_nms_ms", 0.0)
+        tiles_processed = timings.get("tiles_processed", 0)
+        tiles_skipped = timings.get("tiles_skipped", 0)
+        engine_type = getattr(_pipeline, "engine_type", "ONNX Runtime")
+
+        total_tracked_ms = max(t_load_ms + t_infer_ms + t_nms_ms + vis_latency_ms, 0.001)
+        latency_tracker = {
+            "total_str": inference_latency_str,
+            "total_ms": round(inference_latency_s * 1000, 1),
+            "tiles_processed": tiles_processed,
+            "tiles_skipped": tiles_skipped,
+            "engine_type": engine_type,
+            "phases": [
+                {
+                    "name": "Raster Slicing & Normalization",
+                    "time_str": f"{t_load_ms:.1f} ms",
+                    "pct": round((t_load_ms / total_tracked_ms) * 100, 1),
+                    "color": "#00d4ff",
+                },
+                {
+                    "name": (
+                        f"{engine_type} Forward ({tiles_processed} tiles, {tiles_skipped} empty skipped)"
+                        if tiles_skipped > 0
+                        else f"{engine_type} Forward ({tiles_processed} tiles)"
+                    ),
+                    "time_str": f"{t_infer_ms:.1f} ms",
+                    "pct": round((t_infer_ms / total_tracked_ms) * 100, 1),
+                    "color": "#00ff88",
+                },
+                {
+                    "name": "Batched NMS Suppression",
+                    "time_str": f"{t_nms_ms:.1f} ms",
+                    "pct": round((t_nms_ms / total_tracked_ms) * 100, 1),
+                    "color": "#ffb703",
+                },
+                {
+                    "name": "Overlay Rendering & Bounding Boxes",
+                    "time_str": f"{vis_latency_ms:.1f} ms",
+                    "pct": round((vis_latency_ms / total_tracked_ms) * 100, 1),
+                    "color": "#b5179e",
+                },
+            ],
+        }
 
         # Extract image metadata
         try:
@@ -216,9 +290,85 @@ def index():
 
         avg_conf = float(np.mean([d[4] for d in detections])) if detections else 0.0
 
-        logging.info(
-            f"Prediction on {filename}: {len(detections)} detections, "
-            f"avg conf={avg_conf:.3f}"
+        # ── High-threat intelligence (conf >= 0.75) ───────────────────────
+        HIGH_CONF_THRESHOLD = 0.75
+        high_threat_counts: dict[str, int] = {}
+        for det in detections:
+            if det[4] >= HIGH_CONF_THRESHOLD:
+                cls_id = int(det[5])
+                name = _CLASS_NAMES.get(cls_id, f"Class {cls_id}")
+                high_threat_counts[name] = high_threat_counts.get(name, 0) + 1
+
+        # Sort by count descending
+        high_threat_sorted = sorted(high_threat_counts.items(), key=lambda x: x[1], reverse=True)
+
+        # Build natural-language threat brief
+        total_high = sum(high_threat_counts.values())
+        if not high_threat_sorted:
+            threat_brief = (
+                "No objects were detected with high confidence (\u2265 75%). "
+                "Consider lowering the confidence threshold for a broader scan."
+            )
+        elif len(high_threat_sorted) == 1:
+            name, cnt = high_threat_sorted[0]
+            threat_brief = (
+                f"The satellite image contains {cnt} high-confidence "
+                f"{name} target{'s' if cnt > 1 else ''} flagged at \u2265 75% certainty, "
+                f"representing the primary threat in this scan."
+            )
+        else:
+            # Top 3 for the brief
+            parts = []
+            for name, cnt in high_threat_sorted[:3]:
+                parts.append(f"{cnt}\u00d7 {name}")
+            remainder = len(high_threat_sorted) - 3
+            body = ", ".join(parts)
+            if remainder > 0:
+                body += f", and {remainder} additional class{'es' if remainder > 1 else ''}"
+            threat_brief = (
+                f"The satellite image contains {total_high} high-confidence threats across "
+                f"{len(high_threat_sorted)} class{'es' if len(high_threat_sorted) > 1 else ''}: "
+                f"{body}. These detections exceed the 75% certainty threshold and "
+                f"warrant priority review."
+            )
+
+        high_threat_objects = [
+            {"name": name, "count": cnt}
+            for name, cnt in high_threat_sorted
+        ]
+
+        # Log complete detection breakdown to the Detection Details Log
+        log_detection_details(
+            filename=filename,
+            detections=detections,
+            class_names=_CLASS_NAMES,
+            img_metadata=img_metadata,
+            conf_threshold=conf,
+            iou_threshold=iou,
+            extra_info={
+                "pipeline": f"YOLOv8 Tiled Inference ({engine_type})",
+                "unique_classes": len(class_counts),
+                "inference_latency": inference_latency_str,
+                "high_threat_detections": total_high,
+                "latency_breakdown": {
+                    "raster_load_ms": t_load_ms,
+                    "inference_forward_ms": t_infer_ms,
+                    "nms_ms": t_nms_ms,
+                    "overlay_render_ms": vis_latency_ms,
+                    "tiles_processed": tiles_processed,
+                    "tiles_skipped": tiles_skipped,
+                    "engine_type": engine_type,
+                },
+            },
+        )
+
+        # Log deployment/backend event with latency
+        backend_logger.info(
+            f"Prediction completed for {filename} [{engine_type}]: {len(detections)} detections, "
+            f"avg conf={avg_conf:.3f}, total_latency={inference_latency_str} "
+            f"[load={t_load_ms}ms, infer={t_infer_ms}ms, nms={t_nms_ms}ms, vis={vis_latency_ms}ms, "
+            f"tiles_processed={tiles_processed}, tiles_skipped={tiles_skipped}], "
+            f"high-threat={total_high}"
         )
 
         return render_template(
@@ -244,11 +394,17 @@ def index():
             result_image=image_b64,
             conf_val=conf,
             iou_val=iou,
-            img_metadata=img_metadata
+            img_metadata=img_metadata,
+            inference_latency=inference_latency_str,
+            latency_tracker=latency_tracker,
+            engine_type=engine_type,
+            high_threat_objects=high_threat_objects,
+            high_threat_total=total_high,
+            threat_brief=threat_brief,
         )
 
     except FileNotFoundError as exc:
-        logging.error(f"Model not found: {exc}")
+        backend_logger.error(f"Model not found: {exc}")
         return render_template(
             "index.html",
             error=(
@@ -258,7 +414,7 @@ def index():
         )
 
     except Exception as exc:
-        logging.error(f"Prediction error: {exc}")
+        backend_logger.error(f"Prediction error: {exc}")
         return render_template("index.html", error=str(exc))
 
     finally:
@@ -269,7 +425,8 @@ def index():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    backend_logger.info("Health check requested - status: ok")
+    return jsonify({"status": "ok", "service": "satellite-threat-detection", "deployment": "active"})
 
 
 # ---------------------------------------------------------------------------
@@ -277,4 +434,5 @@ def health():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    backend_logger.info("Starting Flask development server on port 5000")
     app.run(debug=True, host="0.0.0.0", port=5000)

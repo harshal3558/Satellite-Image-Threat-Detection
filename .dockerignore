@@ -34,6 +34,7 @@ notebooks/
 *.ipynb
 
 # ── Documentation (not needed inside the container) ──────────────────────────
+docs/
 *.md
 *.pdf
 *.txt
@@ -43,9 +44,14 @@ notebooks/
 # raw_annotations.csv (~18 MB), results.csv, curve PNGs — not needed at inference
 artifacts/
 
-# ── Exported model formats (very large — only best.pt is used by the app) ─────
+# ── Exported model formats ────────────────────────────────────────────────────
+# best.pt  → PyTorch weights  (fallback engine, always included)
+# best.onnx → ONNX Runtime    (preferred engine, explicitly allow below)
+# TensorRT .engine files are excluded (GPU-arch-specific, very large)
 *.engine
+# Exclude all ONNX files EXCEPT best.onnx (the preferred inference engine)
 *.onnx
+!best.onnx
 
 # ── Runtime-generated directories (created fresh by Dockerfile RUN mkdir) ─────
 logs/

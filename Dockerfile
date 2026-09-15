@@ -32,11 +32,16 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir gunicorn
 
 # ── Application source ────────────────────────────────────────────────────────
-# Copies: application.py, best.pt, setup.py, src/, templates/, static/, uploads/
+# Copies: application.py, best.pt, best.onnx (if present), setup.py, src/, templates/, static/, uploads/
 COPY . .
 
 # Install the local src/SITP package so that `from src.SITP...` imports resolve
 RUN pip install --no-cache-dir -e .
+
+# ── Auto-export ONNX model if best.pt exists but best.onnx does not ──────────
+# ONNX Runtime (CPUExecutionProvider) is significantly faster than PyTorch CPU
+RUN [ -f best.pt ] && [ ! -f best.onnx ] && \
+    python -c "from ultralytics import YOLO; YOLO('best.pt').export(format='onnx', imgsz=512, dynamic=True, simplify=True)" || true
 
 # ── Runtime directories ───────────────────────────────────────────────────────
 RUN mkdir -p uploads logs
@@ -46,6 +51,8 @@ ENV FLASK_APP=application.py
 ENV PYTHONUNBUFFERED=1
 # Prevent rasterio from using excessive memory cache
 ENV GDAL_CACHEMAX=256
+# ONNX Runtime engine preference (app auto-selects best.onnx > best.pt)
+ENV ORT_DISABLE_ALL_LOGS=1
 
 # ── Expose Flask port ─────────────────────────────────────────────────────────
 EXPOSE 5000

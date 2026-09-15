@@ -10,6 +10,7 @@ Provides post-training inspection utilities:
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -78,33 +79,41 @@ class ModelMonitoring:
             raise CustomException(e, sys)
 
     # ------------------------------------------------------------------
-    # Tiled large-image inference
+    # Tiled large-image inference (Optimized with Tile Batching & RAM Slicing)
     # ------------------------------------------------------------------
 
     @staticmethod
     def predict_large_image(
         image_path: str | Path,
-        model_path: str | Path,
+        model_path: str | Path | YOLO,
         tile_size: int = 512,
         overlap: int = 100,
         conf_threshold: float = 0.25,
         iou_threshold: float = 0.45,
+        batch_size: int = 16,
+        _timings: dict | None = None,
     ) -> list[list[float]]:
         """
-        Run tiled inference on a large GeoTIFF and return merged detections.
+        Run high-performance tiled inference on a large GeoTIFF and return merged detections.
 
-        The image is divided into overlapping tiles; detections from all tiles
-        are merged into global pixel coordinates and de-duplicated with batched
-        NMS from ``torchvision``.
+        Optimizations applied:
+          - In-memory raster reading (eliminates hundreds of disk window seeks).
+          - Tile batching (runs multi-tile forward passes concurrently).
+          - Warm model reuse (avoids disk weights reloads).
+          - GPU half-precision (FP16) auto-acceleration.
 
         Parameters
         ----------
         image_path      : Path to the GeoTIFF image.
-        model_path      : Path to the trained ``.pt`` weights file.
+        model_path      : YOLO instance or path to the trained ``.pt`` weights file.
         tile_size       : Side length of each tile in pixels.
         overlap         : Pixel overlap between adjacent tiles.
         conf_threshold  : Minimum confidence score to keep a detection.
         iou_threshold   : IoU threshold for NMS.
+        batch_size      : Number of tiles to batch per model forward pass.
+        _timings        : Optional dict; if provided it will be populated with
+                          per-phase latency keys: ``t_load_ms``, ``t_inference_ms``,
+                          ``t_nms_ms``, ``tiles_processed``.
 
         Returns
         -------
@@ -113,7 +122,7 @@ class ModelMonitoring:
             pixel coordinates.
         """
         try:
-            model = YOLO(str(model_path))
+            model = model_path if isinstance(model_path, YOLO) else YOLO(str(model_path))
             stride = tile_size - overlap
             if stride <= 0:
                 raise ValueError("overlap must be smaller than tile_size")
@@ -122,58 +131,129 @@ class ModelMonitoring:
             all_scores: list[float] = []
             all_classes: list[int] = []
 
+            # ── Phase 1: Raster load & normalisation ─────────────────────
+            _t0 = time.perf_counter()
             with rasterio.open(image_path) as src:
                 width, height = src.width, src.height
+                raw_img = src.read()  # (bands, H, W)
 
-                for y in tile_starts(height, tile_size, stride):
-                    for x in tile_starts(width, tile_size, stride):
-                        window = Window(x, y, tile_size, tile_size)
-                        img = src.read(window=window)
-                        if (
-                            img.shape[1] != tile_size
-                            or img.shape[2] != tile_size
-                        ):
-                            continue
+            raw_img = np.transpose(raw_img[:3], (1, 2, 0))  # (H, W, 3)
+            img_normalized = normalize_to_uint8(raw_img)
+            del raw_img  # free memory
+            _t_load = time.perf_counter() - _t0
 
-                        img = np.transpose(img[:3], (1, 2, 0))
-                        img = normalize_to_uint8(img)
+            use_half = torch.cuda.is_available()
+            _tiles_processed = 0
+            _tiles_skipped = 0
 
-                        # Skip empty / solid black background chips to speed up inference
-                        if np.mean(img) < 2.0 and np.std(img) < 1.0:
-                            continue
+            # ── Phase 2: Batched tile inference ──────────────────────────
+            _t1 = time.perf_counter()
 
-                        results = model.predict(
-                            img,
-                            imgsz=tile_size,
-                            conf=conf_threshold,
-                            verbose=False,
+            # Helper function to process a batch of tiles
+            def _process_batch(chips: list[np.ndarray], offsets: list[tuple[int, int]]) -> None:
+                if not chips:
+                    return
+                results = model.predict(
+                    chips,
+                    imgsz=tile_size,
+                    conf=conf_threshold,
+                    verbose=False,
+                    half=use_half,
+                    batch=len(chips),
+                )
+                for result, (x_off, y_off) in zip(results, offsets):
+                    for pred_box in result.boxes:
+                        xyxy = pred_box.xyxy[0].cpu().numpy()
+                        conf = float(pred_box.conf[0].cpu().numpy())
+                        cls = int(pred_box.cls[0].cpu().numpy())
+
+                        all_boxes.append(
+                            [
+                                float(xyxy[0] + x_off),
+                                float(xyxy[1] + y_off),
+                                float(xyxy[2] + x_off),
+                                float(xyxy[3] + y_off),
+                            ]
                         )
+                        all_scores.append(conf)
+                        all_classes.append(cls)
 
-                        for result in results:
-                            for pred_box in result.boxes:
-                                xyxy = pred_box.xyxy[0].cpu().numpy()
-                                conf = float(pred_box.conf[0].cpu().numpy())
-                                cls = int(pred_box.cls[0].cpu().numpy())
+            current_chips: list[np.ndarray] = []
+            current_offsets: list[tuple[int, int]] = []
 
-                                all_boxes.append(
-                                    [
-                                        float(xyxy[0] + x),
-                                        float(xyxy[1] + y),
-                                        float(xyxy[2] + x),
-                                        float(xyxy[3] + y),
-                                    ]
-                                )
-                                all_scores.append(conf)
-                                all_classes.append(cls)
+            for y in tile_starts(height, tile_size, stride):
+                for x in tile_starts(width, tile_size, stride):
+                    chip = img_normalized[y : y + tile_size, x : x + tile_size]
+                    if chip.shape[0] != tile_size or chip.shape[1] != tile_size:
+                        continue
+
+                    # ── Optimization 3: Smart Variance & Background Early-Exit ──
+                    # Microsecond subsampled statistics (stride 4)
+                    sample = chip[::4, ::4]
+                    sample_std = float(np.std(sample))
+                    sample_mean = float(np.mean(sample))
+
+                    # Fast early reject for:
+                    # 1. Featureless water / ocean / uniform terrain (std < 5.0)
+                    # 2. No-data borders / void padding (mean < 4.0 & std < 3.0)
+                    # 3. Saturated cloud whiteout (mean > 245.0 & std < 4.0)
+                    if sample_std < 5.0 or (sample_mean < 4.0 and sample_std < 3.0) or (sample_mean > 245.0 and sample_std < 4.0):
+                        _tiles_skipped += 1
+                        continue
+
+                    current_chips.append(chip)
+                    current_offsets.append((x, y))
+                    _tiles_processed += 1
+
+                    if len(current_chips) >= batch_size:
+                        _process_batch(current_chips, current_offsets)
+                        current_chips.clear()
+                        current_offsets.clear()
+
+            # Process remaining trailing chips
+            if current_chips:
+                _process_batch(current_chips, current_offsets)
+                current_chips.clear()
+                current_offsets.clear()
+
+            _t_inference = time.perf_counter() - _t1
 
             if not all_boxes:
+                # No detections — populate timings and return early
+                if _timings is not None:
+                    _timings.update({
+                        "t_load_ms":      round(_t_load * 1000, 1),
+                        "t_inference_ms": round(_t_inference * 1000, 1),
+                        "t_nms_ms":       0.0,
+                        "tiles_processed": _tiles_processed,
+                        "tiles_skipped":   _tiles_skipped,
+                    })
                 return []
 
+            # ── Phase 3: Batched NMS ──────────────────────────────────
+            _t2 = time.perf_counter()
             keep = torchvision.ops.batched_nms(
                 boxes=torch.tensor(all_boxes, dtype=torch.float32),
                 scores=torch.tensor(all_scores, dtype=torch.float32),
                 idxs=torch.tensor(all_classes, dtype=torch.int64),
                 iou_threshold=iou_threshold,
+            )
+            _t_nms = time.perf_counter() - _t2
+
+            # ── Populate & log phase timings ──────────────────────────
+            if _timings is not None:
+                _timings.update({
+                    "t_load_ms":       round(_t_load * 1000, 1),
+                    "t_inference_ms":  round(_t_inference * 1000, 1),
+                    "t_nms_ms":        round(_t_nms * 1000, 1),
+                    "tiles_processed": _tiles_processed,
+                    "tiles_skipped":   _tiles_skipped,
+                })
+
+            logging.info(
+                f"[LATENCY] Raster load: {_t_load*1000:.1f} ms | "
+                f"Tile inference: {_tiles_processed} processed, {_tiles_skipped} skipped early ({_t_inference*1000:.1f} ms) | "
+                f"NMS: {_t_nms*1000:.1f} ms"
             )
 
             return [

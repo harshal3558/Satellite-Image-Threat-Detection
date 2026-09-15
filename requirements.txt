@@ -10,10 +10,9 @@ pyyaml>=6.0
 opencv-python>=4.8.0
 pandas>=2.0.0
 numpy>=1.24.0
-# -e .
 flask>=3.0.0
 gunicorn
-flask
-opencv-python-headless
-numpy
 werkzeug
+onnxruntime>=1.16.0
+onnx>=1.12.0
+onnxslim>=0.1.71
