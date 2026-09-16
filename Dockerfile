@@ -50,7 +50,7 @@ RUN mkdir -p uploads logs
 ENV FLASK_APP=application.py
 ENV PYTHONUNBUFFERED=1
 # Route Ultralytics settings to writable directory in container
-ENV YOLO_CONFIG_DIR=/tmp/Ultralytics
+ENV YOLO_CONFIG_DIR=/tmp
 # Prevent rasterio from using excessive memory cache
 ENV GDAL_CACHEMAX=256
 # ONNX Runtime engine preference (app auto-selects best.onnx > best.pt)

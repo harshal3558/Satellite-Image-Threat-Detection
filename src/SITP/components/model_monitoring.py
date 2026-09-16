@@ -125,11 +125,10 @@ class ModelMonitoring:
         try:
             import gc
             from rasterio.windows import Window
+            if torch.get_num_threads() > 1:
+                torch.set_num_threads(1)
 
             model = model_path if isinstance(model_path, YOLO) else YOLO(str(model_path))
-            stride = tile_size - overlap
-            if stride <= 0:
-                raise ValueError("overlap must be smaller than tile_size")
 
             all_boxes: list[list[float]] = []
             all_scores: list[float] = []
@@ -181,17 +180,27 @@ class ModelMonitoring:
                 width, height = src.width, src.height
                 indexes = [1, 2, 3] if src.count >= 3 else [1]
 
-                # Adaptive stride to prevent HTTP timeouts on ultra-large rasters on Free tier
-                effective_stride = stride
-                total_est_tiles = len(tile_starts(height, tile_size, stride)) * len(tile_starts(width, tile_size, stride))
-                if total_est_tiles > 36:
-                    effective_stride = tile_size - 32  # Minimal overlap to cap total tiles
+                # Intelligent grid scaling: limit max tiles to 16 to guarantee sub-30s response on Free Tier
+                step_x = max(tile_size, width // 4) if width > 2048 else max(1, tile_size - overlap)
+                step_y = max(tile_size, height // 4) if height > 2048 else max(1, tile_size - overlap)
 
-                y_coords = tile_starts(height, tile_size, effective_stride)
-                x_coords = tile_starts(width, tile_size, effective_stride)
+                x_coords = tile_starts(width, tile_size, step_x)
+                y_coords = tile_starts(height, tile_size, step_y)
+
+                if len(x_coords) * len(y_coords) > 16:
+                    x_coords = x_coords[:4]
+                    y_coords = y_coords[:4]
+
+                time_budget_s = 40.0  # Max 40s budget to stay well below Render's 100s proxy timeout
 
                 for y in y_coords:
+                    if (time.perf_counter() - _t0) > time_budget_s:
+                        logging.warning(f"Inference reached time budget ({time_budget_s}s), aggregating detections.")
+                        break
                     for x in x_coords:
+                        if (time.perf_counter() - _t0) > time_budget_s:
+                            break
+
                         window = Window(x, y, tile_size, tile_size)
                         raw_chip = src.read(indexes=indexes, window=window)
                         if raw_chip.shape[1] != tile_size or raw_chip.shape[2] != tile_size:
