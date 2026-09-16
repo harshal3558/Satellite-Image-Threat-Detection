@@ -81,28 +81,23 @@ def prepare_dirs(output_dir: Path) -> None:
 
 def normalize_to_uint8(chip: np.ndarray) -> np.ndarray:
     """
-    Normalise a chip to uint8 via 1-99 percentile clipping.
-
-    Parameters
-    ----------
-    chip : np.ndarray
-        Input array of any dtype with shape (H, W, C).
-
-    Returns
-    -------
-    np.ndarray
-        uint8 array with the same spatial shape.
+    Normalise a chip/image to uint8 via 1-99 percentile clipping.
+    Optimized for low peak memory consumption on cloud containers.
     """
     chip = np.asarray(chip)
     if chip.dtype == np.uint8:
         return chip
 
-    chip = chip.astype(np.float32)
-    lo, hi = np.percentile(chip, (1, 99))
+    # Fast percentile on subsampled spatial slice to avoid allocating huge float arrays
+    subsample = chip[::4, ::4] if chip.ndim >= 2 and max(chip.shape[:2]) > 256 else chip
+    lo, hi = np.percentile(subsample, (1, 99))
+    lo, hi = float(lo), float(hi)
     if hi <= lo:
-        return np.zeros_like(chip, dtype=np.uint8)
-    chip = np.clip((chip - lo) * 255.0 / (hi - lo), 0, 255)
-    return chip.astype(np.uint8)
+        return np.zeros(chip.shape, dtype=np.uint8)
+
+    # Convert and scale with minimal memory overhead
+    scaled = np.clip((chip.astype(np.float32) - lo) * (255.0 / (hi - lo)), 0, 255).astype(np.uint8)
+    return scaled
 
 
 # ---------------------------------------------------------------------------

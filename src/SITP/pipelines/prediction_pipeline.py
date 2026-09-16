@@ -41,7 +41,7 @@ class PredictPipeline:
         overlap: int = 100,
         conf: float = 0.25,
         iou: float = 0.45,
-        batch_size: int = 16,
+        batch_size: int = 4,
     ) -> None:
         _, _, output_dir = get_paths()
         if model_path:

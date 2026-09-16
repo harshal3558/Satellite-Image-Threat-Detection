@@ -91,29 +91,32 @@ def _allowed(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def _tif_to_rgb(image_path: Path) -> np.ndarray:
-    """Read a GeoTIFF and return a uint8 RGB numpy array."""
+def _tif_to_rgb(image_path: Path, max_dim: int = 1024) -> tuple[np.ndarray, float]:
+    """Read a GeoTIFF, subsampling in rasterio if large to minimize RAM, and return uint8 RGB array."""
     with rasterio.open(image_path) as src:
-        img = src.read()          # shape: (bands, H, W)
+        h, w = src.height, src.width
+        scale = min(max_dim / max(h, w), 1.0)
+        indexes = [1, 2, 3] if src.count >= 3 else [1]
+        if scale < 1.0:
+            out_shape = (len(indexes), int(h * scale), int(w * scale))
+            img = src.read(indexes=indexes, out_shape=out_shape, resampling=rasterio.enums.Resampling.bilinear)
+        else:
+            img = src.read(indexes=indexes)
+
+    if img.shape[0] == 1:
+        img = np.repeat(img, 3, axis=0)
     img = np.transpose(img[:3], (1, 2, 0))   # → (H, W, 3)
-    return normalize_to_uint8(img)
+    return normalize_to_uint8(img), scale
 
 
 def _draw_boxes(
-    image_rgb: np.ndarray,
+    vis: np.ndarray,
     detections: list,
+    scale: float = 1.0,
     class_names: dict[int, str] | None = None,
 ) -> np.ndarray:
-    """Overlay bounding boxes with class names on the image (resized for display)."""
-    vis = image_rgb.copy()
-    h, w = vis.shape[:2]
-
-    # Downscale for browser display (keep under 1024 px on longest side)
-    max_dim = 1024
-    scale = min(max_dim / max(h, w), 1.0)
-    if scale < 1.0:
-        vis = cv2.resize(vis, (int(w * scale), int(h * scale)))
-
+    """Overlay bounding boxes with class names on the image."""
+    vis = vis.copy()
     vh, vw = vis.shape[:2]
     names = class_names or {}
 
@@ -198,9 +201,12 @@ def index():
 
         # Build visualization with timing
         _t_vis_start = time.perf_counter()
-        image_rgb   = _tif_to_rgb(filepath)
-        vis_image   = _draw_boxes(image_rgb, detections, class_names=_CLASS_NAMES)
-        image_b64   = _to_base64(vis_image)
+        image_rgb, display_scale = _tif_to_rgb(filepath, max_dim=1024)
+        vis_image = _draw_boxes(image_rgb, detections, scale=display_scale, class_names=_CLASS_NAMES)
+        image_b64 = _to_base64(vis_image)
+        del image_rgb, vis_image
+        import gc
+        gc.collect()
         vis_latency_ms = round((time.perf_counter() - _t_vis_start) * 1000, 1)
 
         t_load_ms = timings.get("t_load_ms", 0.0)

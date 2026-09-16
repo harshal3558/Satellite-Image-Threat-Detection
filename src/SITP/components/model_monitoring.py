@@ -90,7 +90,7 @@ class ModelMonitoring:
         overlap: int = 100,
         conf_threshold: float = 0.25,
         iou_threshold: float = 0.45,
-        batch_size: int = 16,
+        batch_size: int = 4,
         _timings: dict | None = None,
     ) -> list[list[float]]:
         """
@@ -101,6 +101,7 @@ class ModelMonitoring:
           - Tile batching (runs multi-tile forward passes concurrently).
           - Warm model reuse (avoids disk weights reloads).
           - GPU half-precision (FP16) auto-acceleration.
+          - Low-memory footprint garbage collection for cloud deployments.
 
         Parameters
         ----------
@@ -122,6 +123,7 @@ class ModelMonitoring:
             pixel coordinates.
         """
         try:
+            import gc
             model = model_path if isinstance(model_path, YOLO) else YOLO(str(model_path))
             stride = tile_size - overlap
             if stride <= 0:
@@ -216,6 +218,9 @@ class ModelMonitoring:
                 current_chips.clear()
                 current_offsets.clear()
 
+            del img_normalized
+            gc.collect()
+
             _t_inference = time.perf_counter() - _t1
 
             if not all_boxes:
@@ -256,7 +261,7 @@ class ModelMonitoring:
                 f"NMS: {_t_nms*1000:.1f} ms"
             )
 
-            return [
+            results_list = [
                 [
                     *all_boxes[i],
                     float(all_scores[i]),
@@ -264,6 +269,9 @@ class ModelMonitoring:
                 ]
                 for i in keep.tolist()
             ]
+            del all_boxes, all_scores, all_classes, keep
+            gc.collect()
+            return results_list
 
         except Exception as e:
             raise CustomException(e, sys)
