@@ -12,6 +12,7 @@
 
 <p align="left">
   <a href="https://github.com/harshal3558/Satellite-Image-Threat-Detection"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github" alt="GitHub Repository" /></a>
+  <a href="https://satellite-image-threat-detection.onrender.com"><img src="https://img.shields.io/badge/🌐_Live_App-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white" alt="Live App" /></a>
   <a href="https://drive.google.com/file/d/1hxqn9AMkGxge9_MbiuI_2EhkRX0Z5uCe/view?usp=sharing"><img src="https://img.shields.io/badge/🎥_Watch_Demo-Google_Drive-4285F4?style=for-the-badge&logo=googledrive&logoColor=white" alt="Video Demo" /></a>
 </p>
 

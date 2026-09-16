@@ -54,11 +54,14 @@ ENV GDAL_CACHEMAX=256
 # ONNX Runtime engine preference (app auto-selects best.onnx > best.pt)
 ENV ORT_DISABLE_ALL_LOGS=1
 
-# ── Expose Flask port ─────────────────────────────────────────────────────────
-EXPOSE 5000
+# ── Expose port ───────────────────────────────────────────────────────────────
+# Render Web Services listen on port 10000 by default. Exposing 10000 ensures
+# Render's internal port detection and health check probes match Gunicorn.
+EXPOSE 10000
 
 # ── Start the application via gunicorn (production-grade WSGI server) ─────────
-# - 2 workers is safe for CPU-bound ML inference workload
-# - timeout 300s to handle large image inference time
-# CMD ["gunicorn", "--workers", "2", "--timeout", "300", "--bind", "0.0.0.0:5000", "application:app"]
-CMD sh -c "gunicorn --workers 2 --timeout 300 --bind 0.0.0.0:${PORT:-5000} application:app"
+# - Workers: use ${WEB_CONCURRENCY:-1} (Render defaults to 1 on 512MB tier to prevent OOM)
+# - Threads: 4 threads share single-process memory (avoids duplicating model weights in RAM)
+# - Port: binds to ${PORT:-10000} dynamically assigned by Render
+# - Timeout: 300s to accommodate tiled GeoTIFF satellite image inference
+CMD sh -c "gunicorn --workers ${WEB_CONCURRENCY:-1} --threads 4 --timeout 300 --bind 0.0.0.0:${PORT:-10000} application:app"
