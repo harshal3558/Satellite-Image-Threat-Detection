@@ -3,7 +3,7 @@ Flask web application for Satellite Image Threat Detection.
 
 Routes:
     GET  /           — Upload page
-    POST /           — Run tiled YOLOv8 inference and render results directly
+    POST /           — Run tiled YOLOv26 inference and render results directly
     GET  /health     — Simple health-check endpoint
 """
 
@@ -360,7 +360,7 @@ def index():
             conf_threshold=conf,
             iou_threshold=iou,
             extra_info={
-                "pipeline": f"YOLOv8 Tiled Inference ({engine_type})",
+                "pipeline": f"YOLOv26 Tiled Inference ({engine_type})",
                 "unique_classes": len(class_counts),
                 "inference_latency": inference_latency_str,
                 "high_threat_detections": total_high,
