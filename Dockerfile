@@ -49,6 +49,8 @@ RUN mkdir -p uploads logs
 # ── Environment variables ─────────────────────────────────────────────────────
 ENV FLASK_APP=application.py
 ENV PYTHONUNBUFFERED=1
+# Route Ultralytics settings to writable directory in container
+ENV YOLO_CONFIG_DIR=/tmp/Ultralytics
 # Prevent rasterio from using excessive memory cache
 ENV GDAL_CACHEMAX=256
 # ONNX Runtime engine preference (app auto-selects best.onnx > best.pt)
@@ -64,4 +66,5 @@ EXPOSE 10000
 # - Threads: 4 threads share single-process memory (avoids duplicating model weights in RAM)
 # - Port: binds to ${PORT:-10000} dynamically assigned by Render
 # - Timeout: 300s to accommodate tiled GeoTIFF satellite image inference
-CMD sh -c "gunicorn --workers ${WEB_CONCURRENCY:-1} --threads 4 --timeout 300 --bind 0.0.0.0:${PORT:-10000} application:app"
+# - Graceful Timeout: 120s to allow clean worker transitions
+CMD sh -c "gunicorn --workers ${WEB_CONCURRENCY:-1} --threads 4 --timeout 300 --graceful-timeout 120 --bind 0.0.0.0:${PORT:-10000} application:app"

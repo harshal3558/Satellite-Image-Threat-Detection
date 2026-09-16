@@ -39,25 +39,35 @@ ALLOWED_EXTENSIONS = {"tif", "tiff"}
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 backend_logger.info("Initializing Flask Web Application & Inference Service")
 
-# Warm PredictPipeline instance & class names loaded at startup
+# Global PredictPipeline instance & class names (lazily initialized on first request)
 _pipeline: PredictPipeline | None = None
 _CLASS_NAMES: dict[int, str] = {}
-if Path("best.onnx").exists():
-    _startup_model = "best.onnx"
-elif Path("best.pt").exists():
-    _startup_model = "best.pt"
-else:
-    _startup_model = None
 
-if _startup_model:
-    try:
-        _pipeline = PredictPipeline(model_path=_startup_model)
-        _CLASS_NAMES = _pipeline.model.names or {}
-        backend_logger.info(
-            f"Loaded warm PredictPipeline [{_pipeline.engine_type}] with {len(_CLASS_NAMES)} classes from {_startup_model}"
-        )
-    except Exception as exc:
-        backend_logger.warning(f"Could not pre-load PredictPipeline on startup: {exc}")
+
+def get_pipeline(conf: float = 0.25, iou: float = 0.45) -> PredictPipeline:
+    """Lazily initialize and return the warm PredictPipeline instance."""
+    global _pipeline, _CLASS_NAMES
+    if _pipeline is None:
+        if Path("best.onnx").exists():
+            startup_model = "best.onnx"
+        elif Path("best.pt").exists():
+            startup_model = "best.pt"
+        else:
+            startup_model = None
+
+        try:
+            if startup_model:
+                _pipeline = PredictPipeline(model_path=startup_model, conf=conf, iou=iou)
+            else:
+                _pipeline = PredictPipeline(conf=conf, iou=iou)
+            _CLASS_NAMES = _pipeline.model.names or {}
+            backend_logger.info(
+                f"Loaded warm PredictPipeline [{_pipeline.engine_type}] with {len(_CLASS_NAMES)} classes"
+            )
+        except Exception as exc:
+            backend_logger.error(f"Failed to initialize PredictPipeline: {exc}")
+            raise exc
+    return _pipeline
 
 # Class colours (BGR for OpenCV) — cycles for any number of classes
 _PALETTE = [
@@ -173,14 +183,12 @@ def index():
         conf = float(request.form.get("conf", 0.25))
         iou  = float(request.form.get("iou",  0.45))
 
-        global _pipeline
-        if _pipeline is None:
-            _pipeline = PredictPipeline(conf=conf, iou=iou)
+        pipeline = get_pipeline(conf=conf, iou=iou)
 
         # ── Inference with latency measurement ───────────────────────────
         timings: dict = {}
         _t_start = time.perf_counter()
-        detections = _pipeline.predict(filepath, conf=conf, iou=iou, _timings=timings)
+        detections = pipeline.predict(filepath, conf=conf, iou=iou, _timings=timings)
         inference_latency_s = time.perf_counter() - _t_start
         inference_latency_str = (
             f"{inference_latency_s * 1000:.0f} ms"
@@ -200,7 +208,7 @@ def index():
         t_nms_ms = timings.get("t_nms_ms", 0.0)
         tiles_processed = timings.get("tiles_processed", 0)
         tiles_skipped = timings.get("tiles_skipped", 0)
-        engine_type = getattr(_pipeline, "engine_type", "ONNX Runtime")
+        engine_type = getattr(pipeline, "engine_type", "ONNX Runtime")
 
         total_tracked_ms = max(t_load_ms + t_infer_ms + t_nms_ms + vis_latency_ms, 0.001)
         latency_tracker = {
