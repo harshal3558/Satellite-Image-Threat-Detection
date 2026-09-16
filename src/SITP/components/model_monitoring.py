@@ -124,6 +124,8 @@ class ModelMonitoring:
         """
         try:
             import gc
+            from rasterio.windows import Window
+
             model = model_path if isinstance(model_path, YOLO) else YOLO(str(model_path))
             stride = tile_size - overlap
             if stride <= 0:
@@ -133,28 +135,19 @@ class ModelMonitoring:
             all_scores: list[float] = []
             all_classes: list[int] = []
 
-            # ── Phase 1: Raster load & normalisation ─────────────────────
-            _t0 = time.perf_counter()
-            with rasterio.open(image_path) as src:
-                width, height = src.width, src.height
-                raw_img = src.read()  # (bands, H, W)
-
-            raw_img = np.transpose(raw_img[:3], (1, 2, 0))  # (H, W, 3)
-            img_normalized = normalize_to_uint8(raw_img)
-            del raw_img  # free memory
-            _t_load = time.perf_counter() - _t0
-
             use_half = torch.cuda.is_available()
             _tiles_processed = 0
             _tiles_skipped = 0
 
-            # ── Phase 2: Batched tile inference ──────────────────────────
-            _t1 = time.perf_counter()
+            # ── Phase 1 & 2: Streaming window inference directly from disk ──
+            _t0 = time.perf_counter()
+            _t_inference_acc = 0.0
 
-            # Helper function to process a batch of tiles
             def _process_batch(chips: list[np.ndarray], offsets: list[tuple[int, int]]) -> None:
+                nonlocal _t_inference_acc
                 if not chips:
                     return
+                _ti_start = time.perf_counter()
                 results = model.predict(
                     chips,
                     imgsz=tile_size,
@@ -163,6 +156,7 @@ class ModelMonitoring:
                     half=use_half,
                     batch=len(chips),
                 )
+                _t_inference_acc += (time.perf_counter() - _ti_start)
                 for result, (x_off, y_off) in zip(results, offsets):
                     for pred_box in result.boxes:
                         xyxy = pred_box.xyxy[0].cpu().numpy()
@@ -183,45 +177,59 @@ class ModelMonitoring:
             current_chips: list[np.ndarray] = []
             current_offsets: list[tuple[int, int]] = []
 
-            for y in tile_starts(height, tile_size, stride):
-                for x in tile_starts(width, tile_size, stride):
-                    chip = img_normalized[y : y + tile_size, x : x + tile_size]
-                    if chip.shape[0] != tile_size or chip.shape[1] != tile_size:
-                        continue
+            with rasterio.open(image_path) as src:
+                width, height = src.width, src.height
+                indexes = [1, 2, 3] if src.count >= 3 else [1]
 
-                    # ── Optimization 3: Smart Variance & Background Early-Exit ──
-                    # Microsecond subsampled statistics (stride 4)
-                    sample = chip[::4, ::4]
-                    sample_std = float(np.std(sample))
-                    sample_mean = float(np.mean(sample))
+                # Adaptive stride to prevent HTTP timeouts on ultra-large rasters on Free tier
+                effective_stride = stride
+                total_est_tiles = len(tile_starts(height, tile_size, stride)) * len(tile_starts(width, tile_size, stride))
+                if total_est_tiles > 36:
+                    effective_stride = tile_size - 32  # Minimal overlap to cap total tiles
 
-                    # Fast early reject for:
-                    # 1. Featureless water / ocean / uniform terrain (std < 5.0)
-                    # 2. No-data borders / void padding (mean < 4.0 & std < 3.0)
-                    # 3. Saturated cloud whiteout (mean > 245.0 & std < 4.0)
-                    if sample_std < 5.0 or (sample_mean < 4.0 and sample_std < 3.0) or (sample_mean > 245.0 and sample_std < 4.0):
-                        _tiles_skipped += 1
-                        continue
+                y_coords = tile_starts(height, tile_size, effective_stride)
+                x_coords = tile_starts(width, tile_size, effective_stride)
 
-                    current_chips.append(chip)
-                    current_offsets.append((x, y))
-                    _tiles_processed += 1
+                for y in y_coords:
+                    for x in x_coords:
+                        window = Window(x, y, tile_size, tile_size)
+                        raw_chip = src.read(indexes=indexes, window=window)
+                        if raw_chip.shape[1] != tile_size or raw_chip.shape[2] != tile_size:
+                            continue
 
-                    if len(current_chips) >= batch_size:
-                        _process_batch(current_chips, current_offsets)
-                        current_chips.clear()
-                        current_offsets.clear()
+                        if raw_chip.shape[0] == 1:
+                            raw_chip = np.repeat(raw_chip, 3, axis=0)
+                        chip = np.transpose(raw_chip[:3], (1, 2, 0))
+                        chip = normalize_to_uint8(chip)
 
-            # Process remaining trailing chips
-            if current_chips:
-                _process_batch(current_chips, current_offsets)
-                current_chips.clear()
-                current_offsets.clear()
+                        # Smart variance filter
+                        sample = chip[::4, ::4]
+                        sample_std = float(np.std(sample))
+                        sample_mean = float(np.mean(sample))
 
-            del img_normalized
-            gc.collect()
+                        # Fast reject for blank water, void padding, or cloud whiteout
+                        if sample_std < 5.0 or (sample_mean < 4.0 and sample_std < 3.0) or (sample_mean > 245.0 and sample_std < 4.0):
+                            _tiles_skipped += 1
+                            continue
 
-            _t_inference = time.perf_counter() - _t1
+                        current_chips.append(chip)
+                        current_offsets.append((x, y))
+                        _tiles_processed += 1
+
+                        if len(current_chips) >= batch_size:
+                            _process_batch(current_chips, current_offsets)
+                            current_chips.clear()
+                            current_offsets.clear()
+
+                # Process remaining chips
+                if current_chips:
+                    _process_batch(current_chips, current_offsets)
+                    current_chips.clear()
+                    current_offsets.clear()
+
+            _t_total_scan = time.perf_counter() - _t0
+            _t_load = max(0.0, _t_total_scan - _t_inference_acc)
+            _t_inference = _t_inference_acc
 
             if not all_boxes:
                 # No detections — populate timings and return early
