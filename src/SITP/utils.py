@@ -11,15 +11,13 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import torch
-
-
 # ---------------------------------------------------------------------------
 # Reproducibility
 # ---------------------------------------------------------------------------
 
 def seed_everything(seed: int = 42) -> None:
     """Seed all major random-number generators for reproducibility."""
+    import torch
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -33,6 +31,7 @@ def seed_everything(seed: int = 42) -> None:
 
 def print_device_info() -> None:
     """Print whether CUDA / GPU is available."""
+    import torch
     print(f"CUDA available: {torch.cuda.is_available()}")
     if torch.cuda.is_available():
         print(f"GPU device: {torch.cuda.get_device_name(0)}")

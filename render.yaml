@@ -8,6 +8,8 @@ services:
     dockerfilePath: ./Dockerfile
     envVars:
       - key: PORT
-        value: 10000
+        value: "10000"
       - key: WEB_CONCURRENCY
-        value: 1
+        value: "1"
+      - key: PYTHONUNBUFFERED
+        value: "1"

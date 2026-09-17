@@ -20,10 +20,7 @@ import rasterio
 from flask import Flask, jsonify, render_template, request
 from werkzeug.utils import secure_filename
 
-from ultralytics import YOLO
-
 from src.SITP.logger import backend_logger, detection_logger, log_detection_details, logging
-from src.SITP.pipelines.prediction_pipeline import PredictPipeline
 from src.SITP.utils import normalize_to_uint8
 
 # ---------------------------------------------------------------------------
@@ -40,14 +37,16 @@ os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 backend_logger.info("Initializing Flask Web Application & Inference Service")
 
 # Global PredictPipeline instance & class names (lazily initialized on first request)
-_pipeline: PredictPipeline | None = None
+_pipeline = None
 _CLASS_NAMES: dict[int, str] = {}
 
 
-def get_pipeline(conf: float = 0.25, iou: float = 0.45) -> PredictPipeline:
+def get_pipeline(conf: float = 0.25, iou: float = 0.45):
     """Lazily initialize and return the warm PredictPipeline instance."""
     global _pipeline, _CLASS_NAMES
     if _pipeline is None:
+        from src.SITP.pipelines.prediction_pipeline import PredictPipeline
+
         if Path("best-v26.pt").exists():
             startup_model = "best-v26.pt"
         elif Path("artifacts/best-v26.pt").exists():

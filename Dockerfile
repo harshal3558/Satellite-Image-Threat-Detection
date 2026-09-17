@@ -3,10 +3,9 @@ FROM python:3.10-slim
 
 # ── System dependencies ──────────────────────────────────────────────────────
 # - build-essential      : compilers for wheels that need compilation
-# - libgl1               : OpenCV runtime (libGL) — replaces libgl1-mesa-glx on Debian trixie
-# - libglib2.0-0         : OpenCV runtime (libgthread)
+# - libgl1, libglib2.0-0 : OpenCV runtime (libGL & libgthread)
+# - libsm6, libxext6, libxrender1: X11/headless OpenCV compatibility
 # - libgdal-dev / gdal-bin: rasterio / GDAL bindings
-# - libspatialindex-dev  : rtree / geopandas spatial index
 # - libgomp1             : OpenMP used by PyTorch & ultralytics
 # - python3-dev          : headers needed for some native builds
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -14,10 +13,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     libgl1 \
     libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
     libgomp1 \
     gdal-bin \
     libgdal-dev \
-    libspatialindex-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Working directory ─────────────────────────────────────────────────────────
@@ -27,7 +28,9 @@ WORKDIR /app
 # Copy only requirements first to leverage Docker layer caching
 COPY requirements.txt .
 
+# Pre-install CPU-only PyTorch to save ~2.5 GB of download/disk and prevent OOM
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir gunicorn
 
@@ -37,11 +40,6 @@ COPY . .
 
 # Install the local src/SITP package so that `from src.SITP...` imports resolve
 RUN pip install --no-cache-dir -e .
-
-# ── Auto-export ONNX model if best.pt exists but best.onnx does not ──────────
-# ONNX Runtime (CPUExecutionProvider) is significantly faster than PyTorch CPU
-RUN [ -f best.pt ] && [ ! -f best.onnx ] && \
-    python -c "from ultralytics import YOLO; YOLO('best.pt').export(format='onnx', imgsz=512, dynamic=True, simplify=True)" || true
 
 # ── Runtime directories ───────────────────────────────────────────────────────
 RUN mkdir -p uploads logs
@@ -63,8 +61,8 @@ EXPOSE 10000
 
 # ── Start the application via gunicorn (production-grade WSGI server) ─────────
 # - Workers: use ${WEB_CONCURRENCY:-1} (Render defaults to 1 on 512MB tier to prevent OOM)
-# - Threads: 4 threads share single-process memory (avoids duplicating model weights in RAM)
+# - Threads: 2 threads share single-process memory (avoids duplicating model weights in RAM)
 # - Port: binds to ${PORT:-10000} dynamically assigned by Render
 # - Timeout: 300s to accommodate tiled GeoTIFF satellite image inference
 # - Graceful Timeout: 120s to allow clean worker transitions
-CMD sh -c "gunicorn --workers ${WEB_CONCURRENCY:-1} --threads 4 --timeout 300 --graceful-timeout 120 --bind 0.0.0.0:${PORT:-10000} application:app"
+CMD exec gunicorn --workers ${WEB_CONCURRENCY:-1} --threads 2 --timeout 300 --graceful-timeout 120 --bind 0.0.0.0:${PORT:-10000} application:app
