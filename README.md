@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/ONNX_Runtime-Accelerated-005CED?style=flat&logo=onnx&logoColor=white" alt="ONNX Runtime" />
   <img src="https://img.shields.io/badge/Flask-Web_HUD-000000?style=flat&logo=flask&logoColor=white" alt="Flask" />
   <img src="https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker" />
-  <img src="https://img.shields.io/badge/AWS-ECR%20%7C%20ECS%20Fargate-FF9900?style=flat&logo=amazon-aws&logoColor=white" alt="AWS ECS Fargate" />
+  <img src="https://img.shields.io/badge/AWS-ECR%20%7C%20ECS%20%7C%20Fargate%20%7C%20EC2%20%7C%20IAM-FF9900?style=flat&logo=amazon-aws&logoColor=white" alt="AWS Cloud Architecture" />
   <img src="https://img.shields.io/badge/Design_Docs-HLD_&_LLD-brightgreen?style=flat" alt="Design Docs" />
 </p>
 
@@ -16,7 +16,7 @@
   <a href="https://drive.google.com/file/d/1hxqn9AMkGxge9_MbiuI_2EhkRX0Z5uCe/view?usp=sharing"><img src="https://img.shields.io/badge/🎥_Watch_Demo-Google_Drive-4285F4?style=for-the-badge&logo=googledrive&logoColor=white" alt="Video Demo" /></a>
 </p>
 
-An end-to-end Geospatial Intelligence (GEOINT) Computer Vision pipeline and web application designed to ingest large-format **xView satellite GeoTIFF imagery**, preprocess high-resolution rasters into training chips, fine-tune **YOLOv26**, and perform low-latency **tiled object detection** to identify and localize critical threat and strategic asset classes in satellite imagery. Containerized with **Docker** and deployed on **AWS (ECR + ECS Fargate)**.
+An end-to-end Geospatial Intelligence (GEOINT) Computer Vision pipeline and web application designed to ingest large-format **xView satellite GeoTIFF imagery**, preprocess high-resolution rasters into training chips, fine-tune **YOLOv26**, and perform low-latency **tiled object detection** to identify and localize critical threat and strategic asset classes in satellite imagery. Containerized with **Docker** and deployed on **AWS (ECR + ECS Fargate / EC2 with IAM least-privilege security)**.
 
 ---
 
@@ -247,15 +247,28 @@ Access the application at `http://localhost:10000` (or configured port).
 
 ---
 
-## ☁️ Cloud Deployment on AWS (ECR + ECS Fargate)
+## ☁️ Cloud Deployment on AWS (ECR + ECS Fargate / EC2 + IAM)
 
-The application is containerized and production-ready for automated, serverless deployment on **Amazon Web Services (AWS)** using **Amazon Elastic Container Registry (ECR)** and **Amazon Elastic Container Service (ECS)** on **AWS Fargate**:
+The application is containerized and production-ready for automated, enterprise cloud deployment on **Amazon Web Services (AWS)** using **Amazon Elastic Container Registry (ECR)**, **Amazon Elastic Container Service (ECS)** with **AWS Fargate** (serverless) or **Amazon EC2**, secured via **AWS Identity and Access Management (IAM)** least-privilege policies:
 
 ```
-┌─────────────────────────┐       ┌────────────────────────┐       ┌───────────────────────────────┐
-│   Dockerized SITP App   │ ───>  │     Amazon ECR Repo    │ ───>  │       AWS ECS (Fargate)       │
-│  (Dockerfile + Gunicorn)│       │ (Private Image Registry│       │ (Serverless Container Runner) │
-└─────────────────────────┘       └────────────────────────┘       └───────────────┬───────────────┘
+                                      ┌─────────────────────────────────────┐
+                                      │       AWS IAM Security Layer        │
+                                      │  - Task Execution Role (ECR/Logs)   │
+                                      │  - Task Role (S3/CloudWatch least)  │
+                                      │  - EC2 Instance Profile (SSM/ECS)   │
+                                      └──────────────────┬──────────────────┘
+                                                         │
+┌─────────────────────────┐       ┌──────────────────────▼─┐       ┌───────────────────────────────┐
+│   Dockerized SITP App   │ ───>  │     Amazon ECR Repo    │ ───>  │       Amazon ECS Cluster      │
+│  (Dockerfile + Gunicorn)│       │ (Private Image Registry│       │ ┌───────────────────────────┐ │
+└─────────────────────────┘       └────────────────────────┘       │ │  Option A: AWS Fargate    │ │
+                                                                   │ │  (Serverless Container)   │ │
+                                                                   │ ├───────────────────────────┤ │
+                                                                   │ │  Option B: Amazon EC2     │ │
+                                                                   │ │  (g4dn GPU / c5 Compute)  │ │
+                                                                   │ └─────────────┬─────────────┘ │
+                                                                   └───────────────┼───────────────┘
                                                                                    │
                                                                            ┌───────▼───────┐
                                                                            │ Application   │
@@ -264,50 +277,62 @@ The application is containerized and production-ready for automated, serverless 
                                                                            └───────────────┘
 ```
 
-### AWS Deployment Steps
+### 1. AWS IAM Security & Role Configuration
+SITP follows AWS security best practices with fine-grained IAM roles:
 
-#### 1. Authenticate with Amazon ECR
+* **ECS Task Execution Role (`sitp-ecs-task-execution-role`)**:
+  * Attached Managed Policy: `arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy`
+  * Grants ECS permissions to authenticate with private Amazon ECR, pull the Docker image, and stream container logs to CloudWatch (`logs:CreateLogStream`, `logs:PutLogEvents`).
+* **ECS Task Role (`sitp-ecs-task-role`)**:
+  * Scoped IAM policy granting container runtime least-privilege permissions:
+    * `s3:GetObject` / `s3:PutObject` (for reading input GeoTIFF rasters and persisting detection telemetry dossiers).
+    * `cloudwatch:PutMetricData` (for pushing inference latency and tile count metrics).
+* **EC2 Container Instance Profile (`sitp-ec2-instance-role`)** *(When using EC2 launch type)*:
+  * Attached: `AmazonEC2ContainerServiceforEC2Role` and `AmazonSSMManagedInstanceCore` for secure, keyless Systems Manager session access without opening SSH port 22.
+
+### 2. Amazon ECR Workflow (Image Build & Push)
 ```bash
+# 1. Authenticate Docker with Amazon ECR
 aws ecr get-login-password --region <your-aws-region> | docker login --username AWS --password-stdin <aws_account_id>.dkr.ecr.<your-aws-region>.amazonaws.com
-```
 
-#### 2. Create ECR Repository & Push Docker Image
-```bash
-# Create an Amazon ECR private repository
+# 2. Create private ECR repository
 aws ecr create-repository --repository-name satellite-image-threat-detection --region <your-aws-region>
 
-# Build the optimized production Docker image
+# 3. Build the resource-optimized production Docker image
 docker build -t satellite-image-threat-detection .
 
-# Tag image for Amazon ECR
+# 4. Tag and push image to Amazon ECR
 docker tag satellite-image-threat-detection:latest <aws_account_id>.dkr.ecr.<your-aws-region>.amazonaws.com/satellite-image-threat-detection:latest
-
-# Push image to ECR
 docker push <aws_account_id>.dkr.ecr.<your-aws-region>.amazonaws.com/satellite-image-threat-detection:latest
 ```
 
-#### 3. Configure Amazon ECS Task Definition (AWS Fargate)
-Create an ECS Task Definition configured for serverless execution:
-* **Launch Type:** `FARGATE` (Serverless compute, zero EC2 instance management)
-* **OS / Architecture:** `Linux/X86_64`
-* **Task Size:** `1 vCPU` / `2 GB Memory` (or `2 vCPU` / `4 GB` for high-throughput tiled inference)
-* **Port Mappings:** Container Port `10000` / Protocol `TCP`
-* **Environment Variables:**
-  * `FLASK_APP=application.py`
-  * `PYTHONUNBUFFERED=1`
-  * `PORT=10000`
-  * `WEB_CONCURRENCY=1`
-* **Container Health Check:**
-  * **Command:** `CMD-SHELL, curl -f http://localhost:10000/health || exit 1`
-  * **Interval:** `30s` | **Timeout:** `5s` | **Start Period:** `60s` | **Retries:** `3`
+### 3. Compute Deployment Options: AWS Fargate vs. Amazon EC2
 
-#### 4. Launch Amazon ECS Service
-* Create an ECS Cluster:
-  ```bash
-  aws ecs create-cluster --cluster-name sitp-cluster --region <your-aws-region>
-  ```
-* Create an **ECS Service** with the `FARGATE` launch type attached to your VPC subnets and security group (allowing inbound traffic on port `10000` or port `80/443` via an Application Load Balancer).
-* ECS Fargate automatically pulls the image from ECR, spins up tasks, monitors health via `/health`, and auto-heals any failing containers without manual intervention.
+SITP supports two Amazon ECS launch types depending on operational throughput requirements:
+
+#### Option A: AWS Fargate (Serverless — Recommended for Web & On-Demand)
+* **Compute:** Fully managed serverless compute (zero EC2 maintenance, automatic OS patching).
+* **Sizing:** `1 vCPU` / `2 GB RAM` (or `2 vCPU` / `4 GB RAM` for multi-threaded tiled inference).
+* **Benefits:** Pay-per-second billing, rapid spin-up, zero idle server management.
+
+#### Option B: Amazon EC2 Instances (High-Throughput & GPU Acceleration)
+* **Compute:** Dedicated Amazon EC2 container instances managed via an ECS Auto Scaling Group (Capacity Provider).
+* **Instance Recommendations:**
+  * **GPU Acceleration:** `g4dn.xlarge` (NVIDIA T4 Tensor Core GPU) for high-speed batch inference and half-precision (`FP16`) evaluation.
+  * **Compute-Optimized:** `c5.2xlarge` (8 vCPUs / 16 GB RAM) for dense CPU sliding-window patch parallelism.
+* **Benefits:** Direct hardware access, persistent NVMe scratch storage for gigabyte rasters, and spot-instance cost optimization.
+
+### 4. Amazon ECS Task Definition & Service Launch
+```bash
+# 1. Create the ECS Cluster
+aws ecs create-cluster --cluster-name sitp-cluster --region <your-aws-region>
+
+# 2. Register Task Definition with IAM roles and health check
+# (Specifies container port 10000, executionRoleArn, and taskRoleArn)
+
+# 3. Launch the ECS Service behind an Application Load Balancer (ALB)
+# Automatically runs active HTTP health probes against http://localhost:10000/health
+```
 
 ---
 
