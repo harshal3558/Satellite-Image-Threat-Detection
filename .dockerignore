@@ -1,5 +1,6 @@
 # ── Version control ───────────────────────────────────────────────────────────
 .git
+.github
 .gitignore
 
 # ── Python cache & compiled files ────────────────────────────────────────────
@@ -23,17 +24,13 @@ venv.bak/
 # PROJECT-SPECIFIC — large / not needed for inference
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── Raw xView dataset (GBs of GeoTIFF files — not needed for inference) ───────
+# ── Raw dataset & Training Outputs (Gigabytes of data) ──────────────────────
 data/
-
-# ── YOLO training run outputs (chips, labels, training weights) ───────────────
 xview_yolo/
 
-# ── Jupyter notebooks (not part of the Flask web app) ────────────────────────
+# ── Jupyter notebooks & Docs ────────────────────────────────────────────────
 notebooks/
 *.ipynb
-
-# ── Documentation (not needed inside the container) ──────────────────────────
 docs/
 *.md
 *.pdf
@@ -41,26 +38,35 @@ docs/
 !requirements.txt
 
 # ── Intermediate pipeline artifacts ──────────────────────────────────────────
-# raw_annotations.csv (~18 MB), results.csv, curve PNGs — not needed at inference
 artifacts/
 
-# ── Exported model formats ────────────────────────────────────────────────────
-# best.pt  → PyTorch weights  (fallback engine, always included)
-# best.onnx → ONNX Runtime    (preferred engine, explicitly allow below)
-# TensorRT .engine files are excluded (GPU-arch-specific, very large)
+# ── Scripts not needed at runtime ────────────────────────────────────────────
+main.py
+
+# ── Trained model weights ─────────────────────────────────────────────────────
+# Only allow inference weights if present; ignore all others to save space
+*.pt
+*.pth
+*.safetensors
+*.bin
 *.engine
-# Exclude all ONNX files EXCEPT best.onnx (the preferred inference engine)
 *.onnx
+
+# Allow the fallback / optimized weights required by application.py
+!best-v26.pt
+!best.pt
 !best.onnx
 
-# ── Runtime-generated directories (created fresh by Dockerfile RUN mkdir) ─────
+# ── Runtime-generated directories (created fresh by Dockerfile) ───────────────
 logs/
 uploads/
 
-# ── IDE / editor files ────────────────────────────────────────────────────────
+# ── IDE / editor / agent files ────────────────────────────────────────────────
 .vscode/
 .idea/
 .gemini/
+.agents/
+.cursor/
 *.code-workspace
 
 # ── OS metadata ───────────────────────────────────────────────────────────────
@@ -95,3 +101,39 @@ build/
 # ── DVC ───────────────────────────────────────────────────────────────────────
 .dvc/
 .dvcignore
+
+# ── Additional dataset / caching ──────────────────────────────────────────────
+datasets/
+chips/
+tiles/
+images/
+labels/
+annotations/
+*.tif
+*.tiff
+*.geotiff
+*.geojson
+
+# ── Logs & Checkpoints ────────────────────────────────────────────────────────
+runs/
+weights/
+checkpoints/
+runs_tensorboard/
+mlruns/
+wandb/
+
+# ── Cache & Temp ──────────────────────────────────────────────────────────────
+~/.cache/
+.torch/
+ultralytics/
+tmp/
+temp/
+debug/
+samples/
+demo/
+output/
+
+# ── Render config ─────────────────────────────────────────────────────────────
+render.yaml
+Dockerfile
+.dockerignore

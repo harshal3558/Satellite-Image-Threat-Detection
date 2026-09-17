@@ -46,10 +46,16 @@ class PredictPipeline:
         _, _, output_dir = get_paths()
         if model_path:
             self.model_path = Path(model_path)
+        elif Path("best-v26.pt").exists():
+            self.model_path = Path("best-v26.pt")
+        elif (Path("artifacts") / "best-v26.pt").exists():
+            self.model_path = Path("artifacts") / "best-v26.pt"
         elif Path("best.onnx").exists():
             self.model_path = Path("best.onnx")
         elif Path("best.pt").exists():
             self.model_path = Path("best.pt")
+        elif (Path("artifacts") / "best.pt").exists():
+            self.model_path = Path("artifacts") / "best.pt"
         else:
             self.model_path = output_dir / "satellite_detector" / "weights" / "best.pt"
 

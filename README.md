@@ -70,7 +70,7 @@ The SITP system is organized into modular pipeline stages under `src/SITP`, acco
 
 Scanning massive gigapixel satellite rasters is computationally demanding. SITP implements six latency reduction techniques in [`model_monitoring.py`](file:///c:/Users/harsh/OneDrive/Desktop/Satellite-Image-Threat-Detection/src/SITP/components/model_monitoring.py) and [`prediction_pipeline.py`](file:///c:/Users/harsh/OneDrive/Desktop/Satellite-Image-Threat-Detection/src/SITP/pipelines/prediction_pipeline.py):
 
-* 🔥 **ONNX Runtime Engine (`best.onnx`):** The trained YOLOv8 weights are exported to ONNX format (`imgsz=512, dynamic=True, simplify=True`) and served via **ONNX Runtime 1.24+** with `CPUExecutionProvider`, which applies SIMD vectorization, graph fusion, and operator constant folding — delivering a significant forward-pass speedup over native PyTorch CPU.
+* 🔥 **High-Performance Inference Engine (`best-v26.pt` / `best.onnx`):** The trained YOLOv26 weights (`best-v26.pt`) provide end-to-end small-object detection across 62 target classes. Weights can also be exported to ONNX format (`imgsz=512, dynamic=True, simplify=True`) and served via **ONNX Runtime 1.24+** with `CPUExecutionProvider`, applying SIMD vectorization, graph fusion, and operator constant folding.
 * 🧹 **Smart Variance & Background Tile Early-Exit:** Before each 512×512 chip is sent to the neural network, a microsecond subsampled standard-deviation check (`chip[::4, ::4]`) rejects:
   * Featureless ocean / uniform terrain ($\sigma < 5.0$)
   * Void/no-data border padding ($\mu < 4.0$ and $\sigma < 3.0$)
@@ -99,9 +99,10 @@ logs/
 ### 1. Backend & Deployment Log (`logs/backend/`)
 Captures Flask web server startup, health-check requests (`/health`), pipeline orchestration, model weight checkpoints, and exception tracebacks:
 ```text
-[ 2026-09-15 14:05:08,479 ] 39 SITP.Backend - INFO - Initializing Flask Web Application & Inference Service
-[ 2026-09-15 14:05:08,928 ] 47 SITP.Backend - INFO - Loaded 62 class names from best.pt
-[ 2026-09-15 14:05:08,960 ] 284 SITP.Backend - INFO - Health check requested - status: ok
+[ 2026-09-17 10:45:30,508 ] 40 SITP.Backend - INFO - Initializing Flask Web Application & Inference Service
+[ 2026-09-17 10:45:31,246 ] 82 SITP.Backend - INFO - PredictPipeline initialized with warm PyTorch model: best-v26.pt
+[ 2026-09-17 10:45:31,249 ] 70 SITP.Backend - INFO - Loaded warm PredictPipeline [PyTorch] with 62 classes
+[ 2026-09-17 10:45:31,250 ] 284 SITP.Backend - INFO - Health check requested - status: ok
 ```
 
 ### 2. Detection Details Log (`logs/detection/`)
@@ -109,7 +110,7 @@ Exclusively captures itemized threat detection records for every analyzed GeoTIF
 ```text
 ================================================================================
 THREAT DETECTION EVENT: 10.tif
-Timestamp: 2026-09-15 14:27:48
+Timestamp: 2026-09-17 10:47:35
 --------------------------------------------------------------------------------
 IMAGE METADATA:
   * Filename: 10.tif
@@ -122,31 +123,20 @@ IMAGE METADATA:
 INFERENCE CONFIGURATION:
   * Confidence Threshold: 0.25
   * IoU Threshold (NMS): 0.45
-  * Pipeline: YOLOv8 Tiled Inference (ONNX Runtime)
+  * Pipeline: YOLOv26 Tiled Inference (best-v26.pt)
 --------------------------------------------------------------------------------
 DETECTION SUMMARY:
-  * Total Threats Detected: 46
-  * Unique Threat Classes: 5
-  * Average Confidence: 68.45% (Score: 0.6845)
-  * Highest Confidence: 94.20%
-  * Lowest Confidence:  25.30%
-  * Class Breakdown:
-      - Passenger Vehicle        :   24 detections (52.2%)
-      - Maritime Vessel          :   12 detections (26.1%)
-      - Cargo Truck              :    6 detections (13.0%)
-      - Aircraft                 :    4 detections (8.7%)
+  * Total Threats Detected: 8
+  * Unique Threat Classes: 2
+  * Average Confidence: 45.34% (Score: 0.4534)
+  * Highest Confidence: 61.09%
+  * Lowest Confidence:  35.41%
 --------------------------------------------------------------------------------
 LATENCY BREAKDOWN:
-  * Inference Latency: 1.24 s
-  * Raster Load: 120.4 ms  |  Forward Pass: 845.2 ms  |  NMS: 12.1 ms  |  Render: 214.8 ms
-  * Tiles Processed: 32  |  Tiles Skipped (background): 18
-  * Engine: ONNX Runtime (CPUExecutionProvider)
---------------------------------------------------------------------------------
-ITEMIZED THREAT DETECTIONS:
-  #    | Class Name (ID)                | Confidence   | Bounding Box [x1, y1, x2, y2]       | Box Size (WxH)
-  ---------------------------------------------------------------------------------------------------------
-  1    | Maritime Vessel (2)            | 94.2% (0.942) | [120.5, 340.2, 185.0, 410.8]        | 64.5x70.6 px
-  2    | Aircraft (1)                   | 88.1% (0.881) | [500.1, 620.0, 560.4, 690.3]        | 60.3x70.3 px
+  * Inference Latency: 1.84 s
+  * Raster Load: 1103.9 ms  |  Tile Forward Pass: 17301.2 ms  |  NMS: 28.4 ms
+  * Tiles Processed: 16  |  Tiles Skipped (background): 0
+  * Engine: PyTorch (best-v26.pt)
 ================================================================================
 ```
 
@@ -188,20 +178,14 @@ data/
 ## 🚀 Running the Project
 
 ### Step 1: Model Training
-To execute the end-to-end training pipeline (Ingestion ➔ Transformation ➔ YOLOv8 Training ➔ Diagnostics):
+To execute the end-to-end training pipeline (Ingestion ➔ Transformation ➔ YOLOv26 Training ➔ Diagnostics):
 ```bash
 python main.py
 ```
 Outputs and checkpoints will be saved to `xview_yolo/satellite_detector/weights/best.pt`.
 
-### Step 2: Export to ONNX Runtime (Recommended for Latency)
-After training, export `best.pt` to ONNX for significantly faster CPU inference:
-```bash
-python -c "from ultralytics import YOLO; YOLO('best.pt').export(format='onnx', imgsz=512, dynamic=True, simplify=True)"
-```
-This generates `best.onnx` in the project root. The application **automatically uses `best.onnx` if present**, falling back to `best.pt` if not.
-
-### Step 3: Launch Tactical Web Dashboard
+### Step 2: Running Inference / Web Dashboard
+The application automatically prioritizes and loads the trained YOLOv26 weights (`best-v26.pt` / `best.pt`):
 ```bash
 python application.py
 ```
@@ -295,8 +279,9 @@ Access the application at `http://localhost:5000`.
 │       └── style.css          # Military HUD styling (100vh locked viewport)
 ├── HLD.pdf                    # High-Level System Architecture document
 ├── LLD.pdf                    # Low-Level Design document
-├── best.pt                    # PyTorch model weights (fallback)
-├── best.onnx                  # ONNX Runtime exported weights (preferred, faster)
+├── best-v26.pt                # Active trained YOLOv26 model weights (155 MB)
+├── best.pt                    # PyTorch model weights
+├── best.onnx                  # ONNX Runtime exported weights (optional)
 ├── application.py             # Flask web server entry point
 ├── main.py                    # Training pipeline entry point
 ├── Dockerfile                 # Docker configuration

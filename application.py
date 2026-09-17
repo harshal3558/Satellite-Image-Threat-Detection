@@ -48,10 +48,16 @@ def get_pipeline(conf: float = 0.25, iou: float = 0.45) -> PredictPipeline:
     """Lazily initialize and return the warm PredictPipeline instance."""
     global _pipeline, _CLASS_NAMES
     if _pipeline is None:
-        if Path("best.onnx").exists():
+        if Path("best-v26.pt").exists():
+            startup_model = "best-v26.pt"
+        elif Path("artifacts/best-v26.pt").exists():
+            startup_model = "artifacts/best-v26.pt"
+        elif Path("best.onnx").exists():
             startup_model = "best.onnx"
         elif Path("best.pt").exists():
             startup_model = "best.pt"
+        elif Path("artifacts/best.pt").exists():
+            startup_model = "artifacts/best.pt"
         else:
             startup_model = None
 
