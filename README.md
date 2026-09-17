@@ -7,6 +7,7 @@
   <img src="https://img.shields.io/badge/ONNX_Runtime-Accelerated-005CED?style=flat&logo=onnx&logoColor=white" alt="ONNX Runtime" />
   <img src="https://img.shields.io/badge/Flask-Web_HUD-000000?style=flat&logo=flask&logoColor=white" alt="Flask" />
   <img src="https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/AWS-ECR%20%7C%20ECS%20Fargate-FF9900?style=flat&logo=amazon-aws&logoColor=white" alt="AWS ECS Fargate" />
   <img src="https://img.shields.io/badge/Design_Docs-HLD_&_LLD-brightgreen?style=flat" alt="Design Docs" />
 </p>
 
@@ -16,7 +17,7 @@
   <a href="https://drive.google.com/file/d/1hxqn9AMkGxge9_MbiuI_2EhkRX0Z5uCe/view?usp=sharing"><img src="https://img.shields.io/badge/🎥_Watch_Demo-Google_Drive-4285F4?style=for-the-badge&logo=googledrive&logoColor=white" alt="Video Demo" /></a>
 </p>
 
-An end-to-end Geospatial Intelligence (GEOINT) Computer Vision pipeline and web application designed to ingest large-format **xView satellite GeoTIFF imagery**, preprocess high-resolution rasters into training chips, fine-tune **YOLOv26**, and perform low-latency **tiled object detection** to identify and localize critical threat and strategic asset classes in satellite imagery.
+An end-to-end Geospatial Intelligence (GEOINT) Computer Vision pipeline and web application designed to ingest large-format **xView satellite GeoTIFF imagery**, preprocess high-resolution rasters into training chips, fine-tune **YOLOv26**, and perform low-latency **tiled object detection** to identify and localize critical threat and strategic asset classes in satellite imagery. Containerized with **Docker** and production-ready for deployment on **AWS (ECR + ECS Fargate)** and cloud platforms.
 
 ---
 
@@ -241,9 +242,73 @@ To containerize and run the application in Docker:
 docker build -t satellite-threat-detection .
 
 # Run the container
-docker run -p 5000:5000 satellite-threat-detection
+docker run -p 10000:10000 satellite-threat-detection
 ```
-Access the application at `http://localhost:5000`.
+Access the application at `http://localhost:10000` (or configured port).
+
+---
+
+## ☁️ Cloud Deployment on AWS (ECR + ECS Fargate)
+
+The application is containerized and production-ready for automated, serverless deployment on **Amazon Web Services (AWS)** using **Amazon Elastic Container Registry (ECR)** and **Amazon Elastic Container Service (ECS)** on **AWS Fargate**:
+
+```
+┌─────────────────────────┐       ┌────────────────────────┐       ┌───────────────────────────────┐
+│   Dockerized SITP App   │ ───>  │     Amazon ECR Repo    │ ───>  │       AWS ECS (Fargate)       │
+│  (Dockerfile + Gunicorn)│       │ (Private Image Registry│       │ (Serverless Container Runner) │
+└─────────────────────────┘       └────────────────────────┘       └───────────────┬───────────────┘
+                                                                                   │
+                                                                           ┌───────▼───────┐
+                                                                           │ Application   │
+                                                                           │ Load Balancer │
+                                                                           │  (Public HUD) │
+                                                                           └───────────────┘
+```
+
+### AWS Deployment Steps
+
+#### 1. Authenticate with Amazon ECR
+```bash
+aws ecr get-login-password --region <your-aws-region> | docker login --username AWS --password-stdin <aws_account_id>.dkr.ecr.<your-aws-region>.amazonaws.com
+```
+
+#### 2. Create ECR Repository & Push Docker Image
+```bash
+# Create an Amazon ECR private repository
+aws ecr create-repository --repository-name satellite-image-threat-detection --region <your-aws-region>
+
+# Build the optimized production Docker image
+docker build -t satellite-image-threat-detection .
+
+# Tag image for Amazon ECR
+docker tag satellite-image-threat-detection:latest <aws_account_id>.dkr.ecr.<your-aws-region>.amazonaws.com/satellite-image-threat-detection:latest
+
+# Push image to ECR
+docker push <aws_account_id>.dkr.ecr.<your-aws-region>.amazonaws.com/satellite-image-threat-detection:latest
+```
+
+#### 3. Configure Amazon ECS Task Definition (AWS Fargate)
+Create an ECS Task Definition configured for serverless execution:
+* **Launch Type:** `FARGATE` (Serverless compute, zero EC2 instance management)
+* **OS / Architecture:** `Linux/X86_64`
+* **Task Size:** `1 vCPU` / `2 GB Memory` (or `2 vCPU` / `4 GB` for high-throughput tiled inference)
+* **Port Mappings:** Container Port `10000` / Protocol `TCP`
+* **Environment Variables:**
+  * `FLASK_APP=application.py`
+  * `PYTHONUNBUFFERED=1`
+  * `PORT=10000`
+  * `WEB_CONCURRENCY=1`
+* **Container Health Check:**
+  * **Command:** `CMD-SHELL, curl -f http://localhost:10000/health || exit 1`
+  * **Interval:** `30s` | **Timeout:** `5s` | **Start Period:** `60s` | **Retries:** `3`
+
+#### 4. Launch Amazon ECS Service
+* Create an ECS Cluster:
+  ```bash
+  aws ecs create-cluster --cluster-name sitp-cluster --region <your-aws-region>
+  ```
+* Create an **ECS Service** with the `FARGATE` launch type attached to your VPC subnets and security group (allowing inbound traffic on port `10000` or port `80/443` via an Application Load Balancer).
+* ECS Fargate automatically pulls the image from ECR, spins up tasks, monitors health via `/health`, and auto-heals any failing containers without manual intervention.
 
 ---
 
